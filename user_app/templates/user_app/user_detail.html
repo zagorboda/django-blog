@@ -1,0 +1,10 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+ 
+{% block content %}
+    <h1>User detail</h1>
+    {{user.username}}
+    {{user.userprofile.bio}}
+    {{user.userprofile.location}}
+    {{user.id}}
+{% endblock content %}

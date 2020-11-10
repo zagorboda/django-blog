@@ -16,12 +16,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from . import views
-from django.contrib.auth.views import LoginView, PasswordResetDoneView
+# from django.contrib.auth.views import LoginView, PasswordResetDoneView
 
 app_name = 'user_app'
 urlpatterns = [
     path('test_redirect/', views.testing_redirect, name='test_red'),
     path('', include('django.contrib.auth.urls'), name='account'),
     path('signup/', views.signup_view, name='signup'),
-    path('pass/', views.signup_view, name='signup'),
+    # path('pass/', views.signup_view, name='signup'),
+    path('profile/<str:name>/', views.user_detail_view, name='profile'),
 ]
