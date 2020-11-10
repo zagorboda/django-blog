@@ -1,5 +1,3 @@
 blog/settings.py
 
 *.pyc
-
-blog/__pychache__/
