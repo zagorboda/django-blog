@@ -17,9 +17,11 @@ from django.contrib import admin
 from django.urls import path, include
 from . import views
 # from django.contrib.auth.views import LoginView, PasswordResetDoneView
+from  django.contrib.auth.views import auth_logout
 
 app_name = 'user_app'
 urlpatterns = [
+    path('logout/', views.logout_view, name='logout'),
     path('test_redirect/', views.testing_redirect, name='test_red'),
     path('', include('django.contrib.auth.urls'), name='account'),
     path('signup/', views.signup_view, name='signup'),

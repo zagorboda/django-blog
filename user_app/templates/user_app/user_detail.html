@@ -1,10 +1,47 @@
 {% extends "layouts/base.html" %}
 {% load static %}
- 
+
+{% block title %}
+    {% if not error %}
+        {{user.username}}
+    {% else %}
+        User not found
+    {% endif %}
+{% endblock title %}
+
 {% block content %}
-    <h1>User detail</h1>
-    {{user.username}}
-    {{user.userprofile.bio}}
-    {{user.userprofile.location}}
-    {{user.id}}
+
+    {% if error %}
+        {{ error }}
+    {% else %}
+
+<!--        <h1>User profile</h1>-->
+        {{user_profile.username}}
+<!--        {{user_profile.userprofile.bio}}-->
+<!--        {{user_profile.userprofile.location}}-->
+<!--        {{user_profile.id}}-->
+
+
+        {% if posts_list %}
+
+        <hr>
+        <h3>User posts</h3>
+
+        <div class="container">
+        {% for post in posts_list %}
+            <div class="row">
+                <h3><a href="{% url 'blog_app:post_detail' post.slug %}">{{post.title}}</a></h3>
+                <p class="text-muted" style="width:100%;">{{ post.created_on}}</p>
+                <p>{{post.content|slice:":200" }}</p>
+            </div>
+        {% endfor %}
+
+        </div>
+
+        {% endif %}
+
+    {% endif %}
+
+
+
 {% endblock content %}
