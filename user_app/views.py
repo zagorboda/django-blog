@@ -7,7 +7,9 @@ from django.contrib.auth.models import User
 # from django.views import generic
 from django.contrib.auth import logout
 
-from . import models
+# from . import models
+
+from blog_app.models import Post
 
 from blog_app.models import Post
 
@@ -42,8 +44,7 @@ def user_detail_view(request, name):
     try:
         user = User.objects.get(username=name)
         context['user_profile'] = user
-
-        posts_list = Post.objects.filter(author=user)
+        posts_list = Post.objects.filter(author=user, status=1)
         context['posts_list'] = posts_list
     except Exception as e:
         print(e)
