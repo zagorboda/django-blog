@@ -17,10 +17,11 @@ urlpatterns = [
     # path('', include(router.urls)),
     # path('users/', views.UserList.as_view()),
     # path('users/<str:name>/', views.UserDetail.as_view()),
+
     path('posts/', views.PostList.as_view(), name='post-list'),
-    path('posts/<str:slug>/', views.PostDetail.as_view()),
-    path('users/', views.UserList.as_view(), name='user_app-list'),
-    path('users/<str:username>/', views.UserDetail.as_view()),
+    path('posts/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
+    path('users/', views.UserList.as_view(), name='user-list'),
+    path('users/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
     path('api-auth/', include('rest_framework.urls')),
     path('', views.api_root),
 ]

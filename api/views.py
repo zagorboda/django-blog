@@ -15,7 +15,7 @@ from django.contrib.auth.models import User
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({
-        'users': reverse('user_app-list', request=request, format=format),
+        'users': reverse('user-list', request=request, format=format),
         'posts': reverse('post-list', request=request, format=format)
     })
 

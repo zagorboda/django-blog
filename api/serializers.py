@@ -7,21 +7,38 @@ from django.contrib.auth.models import User
 
 
 class PostSerializer(serializers.HyperlinkedModelSerializer):
-    # author = UserSerializer()
-    author = serializers.ReadOnlyField(source='author.username')
+    url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
+    owner = serializers.ReadOnlyField(source='author.username')
 
     class Meta:
         model = Post
-        fields = ['id', 'title', 'content', 'slug', 'author', 'created_on']
+        fields = ['url', 'id', 'title', 'content', 'slug', 'owner', 'created_on']
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
-    # snippets = serializers.HyperlinkedRelatedField(many=True, view_name='snippet-detail', read_only=True)
-    posts = serializers.PrimaryKeyRelatedField(many=True, queryset=Post.objects.all())
+    url = serializers.HyperlinkedIdentityField(view_name='user-detail', lookup_field='username')
+    posts = serializers.HyperlinkedRelatedField(many=True, view_name='post-detail', read_only=True, lookup_field='slug')
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'posts']
+        fields = ['url', 'id', 'username', 'posts']
+
+
+# class PostSerializer(serializers.HyperlinkedModelSerializer):
+#     # author = UserSerializer()
+#     author = serializers.ReadOnlyField(source='author.username')
+#
+#     class Meta:
+#         model = Post
+#         fields = ['url', 'id', 'title', 'content', 'slug', 'author', 'created_on']
+#
+#
+# class UserSerializer(serializers.HyperlinkedModelSerializer):
+#     posts = serializers.HyperlinkedRelatedField(many=True, view_name='post-detail', read_only=True)
+#
+#     class Meta:
+#         model = User
+#         fields = ['url', 'id', 'username', 'posts']
 
     # def to_representation(self, instance):
     #     representation = super().to_representation(instance)
