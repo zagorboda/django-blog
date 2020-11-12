@@ -1,26 +1,108 @@
+from rest_framework.reverse import reverse
 from rest_framework.views import APIView
-from .serializers import PostSerializer, UserSerializer
+from .serializers import UserSerializer, PostSerializer
 from rest_framework.response import Response
-from rest_framework import renderers, viewsets, generics
-from rest_framework.decorators import action
+from rest_framework import renderers, viewsets, generics, status
+from rest_framework.decorators import action, api_view
+from rest_framework import permissions
+from .permissions import IsOwnerOrReadOnly
 
 from blog_app.models import Post
 # from user_app.models import CustomUser
 from django.contrib.auth.models import User
 
 
-class PostViewSet(viewsets.ModelViewSet):
-    queryset = Post.objects.all().filter(status=1)
+@api_view(['GET'])
+def api_root(request, format=None):
+    return Response({
+        'users': reverse('user_app-list', request=request, format=format),
+        'posts': reverse('post-list', request=request, format=format)
+    })
+
+
+class PostList(generics.ListCreateAPIView):
+    queryset = Post.objects.all()
     serializer_class = PostSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrReadOnly]
+
+
+class PostDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrReadOnly]
 
     lookup_field = 'slug'
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserList(generics.ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+
+class UserDetail(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
     lookup_field = 'username'
+
+
+# class PostViewSet(viewsets.ModelViewSet):
+#     queryset = Post.objects.all().filter(status=1)
+#     serializer_class = PostSerializer
+#
+#     lookup_field = 'slug'
+
+
+# class UserViewSet(viewsets.ReadOnlyModelViewSet):
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
+#
+#     lookup_field = 'username'
+
+
+# class UserViewSet(viewsets.ReadOnlyModelViewSet):
+#     """
+#     This viewset automatically provides `list` and `retrieve` actions.
+#     """
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
+#
+#     lookup_field = 'id'
+
+
+# class UserList(APIView):
+#
+#     def get(self, request):
+#         users = User.objects.all()
+#         serializer = UserSerializer(users, many=True)
+#         return Response(serializer.data)  # Return JSON
+#
+#
+# class UserDetail(APIView):
+#
+#     def get(self, request, name):
+#         users = User.objects.get(username=name)
+#         serializer1 = UserSerializer(users)
+#         print(serializer1)
+#         print(serializer1.data)
+#         # users2 = User.objects.get(username='admin')
+#         # serializer2 = UserSerializer(users2)
+#         return Response(serializer1.data)  # Return JSON
+
+
+# @api_view(['GET'])
+# def get_configuration(request):
+#     m = Post.objects.all()
+#     serializer = PostSerializer(m)
+#     return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 
 # class PostDetail(APIView):
