@@ -4,13 +4,14 @@ from django.contrib.auth.models import User
 # from django.dispatch import receiver
 
 
-# class CustomUser(User):
-#     # username = models.CharField(max_length=50, unique=True)
-#
-#     some_new_field = models.CharField(max_length=50, default='Some value')
-#
-#     def __str__(self):
-#         return "{}".format(self.username)
+# class CustomUser():
+#     pass
+    # username = models.CharField(max_length=50, unique=True)
+
+    # some_new_field = models.CharField(max_length=50, default='Some value')
+
+    # def __str__(self):
+    #     return "{}".format(self.username)
 
 
 # TODO: try this

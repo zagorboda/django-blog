@@ -4,7 +4,7 @@ from .models import Post
 
 from django.contrib.auth.decorators import login_required, permission_required
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse, Http404
 from django.urls import reverse
 
 from django.template.defaultfilters import slugify
@@ -21,9 +21,19 @@ class PostList(generic.ListView):
     template_name = 'blog_app/index.html'
 
 
+# TODO: return object only if it status==1, else 404
 class PostDetail(generic.DetailView):
     model = Post
     template_name = 'blog_app/post_detail.html'
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.status:
+            context = self.get_context_data(object=self.object)
+            return self.render_to_response(context)
+        else:
+            raise Http404
+            # return HttpResponse(status=404)
 
 
 @login_required
