@@ -16,6 +16,7 @@ from datetime import datetime
 
 
 class PostList(generic.ListView):
+    paginate_by = 5
     queryset = Post.objects.filter(status=1).order_by('-created_on')[:10]
     template_name = 'blog_app/index.html'
 
