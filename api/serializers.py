@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 class PostSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
     owner = serializers.ReadOnlyField(source='author.username')
+    # owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = Post

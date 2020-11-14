@@ -2,10 +2,11 @@ from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 from .serializers import UserSerializer, PostSerializer
 from rest_framework.response import Response
-from rest_framework import renderers, viewsets, generics, status
+from rest_framework import renderers, viewsets, generics, status, permissions
 from rest_framework.decorators import action, api_view
-from rest_framework import permissions
 from .permissions import IsOwnerOrReadOnly
+from django.contrib.auth import logout
+from django.shortcuts import redirect
 
 from blog_app.models import Post
 # from user_app.models import CustomUser
@@ -15,24 +16,25 @@ from django.contrib.auth.models import User
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({
-        'users': reverse('user-list', request=request, format=format),
-        'posts': reverse('post-list', request=request, format=format)
+        'user': reverse('user-list', request=request, format=format),
+        # 'posts': reverse('post-list', request=request, format=format),
+        'blog': reverse('blog_main_page', request=request, format=format)
     })
 
 
-class PostList(generics.ListCreateAPIView):
-    queryset = Post.objects.all()
+class PostList(generics.ListAPIView):
+    queryset = Post.objects.all().filter(status=1)
     serializer_class = PostSerializer
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+    # def perform_create(self, serializer):
+    #     serializer.save(author=self.request.user)
 
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrReadOnly]
+    # permission_classes = [permissions.IsAuthenticatedOrReadOnly,
+    #                       IsOwnerOrReadOnly]
 
 
-class PostDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Post.objects.all()
+class PostDetail(generics.RetrieveAPIView):
+    queryset = Post.objects.all().filter(status=1)
     serializer_class = PostSerializer
 
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,
@@ -51,6 +53,23 @@ class UserDetail(generics.RetrieveAPIView):
     serializer_class = UserSerializer
 
     lookup_field = 'username'
+
+
+class BlogMainPage(generics.ListAPIView):
+    queryset = Post.objects.all().filter(status=1)
+    serializer_class = PostSerializer
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('blog_main_page')
+
+
+    # def perform_create(self, serializer):
+    #     serializer.save(author=self.request.user)
+
+    # permission_classes = [permissions.IsAuthenticatedOrReadOnly,
+    #                       IsOwnerOrReadOnly]
 
 
 # class PostViewSet(viewsets.ModelViewSet):
