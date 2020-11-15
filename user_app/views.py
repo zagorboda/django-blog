@@ -1,3 +1,4 @@
+from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.forms import UserCreationForm
 # from django.http import HttpResponseRedirect
@@ -6,10 +7,6 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 # from django.views import generic
 from django.contrib.auth import logout
-
-# from . import models
-
-from blog_app.models import Post
 
 from blog_app.models import Post
 
@@ -39,24 +36,17 @@ def signup_view(request):
 
 def user_detail_view(request, name):
     context = dict()
-    print(name)
-    print(request.user)
     try:
         user = User.objects.get(username=name)
         context['user_profile'] = user
         posts_list = Post.objects.filter(author=user, status=1)
         context['posts_list'] = posts_list
+        return render(request, "user_app/user_detail.html", context)
     except Exception as e:
-        print(e)
-        context['error'] = 'User not found'
-    print(context)
-    return render(request, "user_app/user_detail.html", context)
+        raise Http404
+        # context['error'] = 'User not found'
 
 
 def logout_view(request):
     logout(request)
     return redirect('blog_app:home')
-
-
-def testing_redirect(request):
-    return redirect('user_app:login')
