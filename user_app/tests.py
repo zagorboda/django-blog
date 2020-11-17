@@ -1,8 +1,6 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-# from django.contrib.auth import login
-# from django.test import Client
 
 from blog_app.models import Post
 from datetime import datetime

@@ -1,12 +1,8 @@
 from django.shortcuts import render
 from django.views import generic
-from .models import Post
-
-from django.contrib.auth.decorators import login_required, permission_required
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponseRedirect, HttpResponse, Http404
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseRedirect, Http404
 from django.urls import reverse
-
 from django.template.defaultfilters import slugify
 
 from .forms import NewPostForm
@@ -57,10 +53,8 @@ def create_new_post(request):
             new_post.save()
 
             return HttpResponseRedirect(reverse('blog_app:home'))
-
-    # If this is a GET (or any other method) create the default form.
     else:
-        form = NewPostForm()  # initial={'renewal_date': proposed_renewal_date}
+        form = NewPostForm()
 
     context = {
         'form': form,
