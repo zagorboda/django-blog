@@ -9,7 +9,7 @@ from django.urls import reverse
 
 from django.template.defaultfilters import slugify
 
-from .forms import NewPostForm
+from .forms import NewPostForm, CommentForm
 from .models import Post
 
 from datetime import datetime
@@ -23,19 +23,52 @@ class PostList(generic.ListView):
 
 
 # TODO: return object only if it status==1, else 404
-class PostDetail(generic.DetailView):
-    """ Show single post """
-    model = Post
+def post_detail(request, slug):
     template_name = 'blog_app/post_detail.html'
+    post = get_object_or_404(Post, slug=slug)
+    comments = post.comments.filter(active=True)
+    new_comment = None
+    # Comment posted
+    if request.method == 'POST':
+        comment_form = CommentForm(data=request.POST)
+        if comment_form.is_valid():
+            # Create Comment object but don't save to database yet
+            new_comment = comment_form.save(commit=False)
+            # Assign the current post to the comment
+            new_comment.post = post
+            # Save the comment to the database
+            new_comment.save()
+    else:
+        comment_form = CommentForm()
 
-    def get(self, request, *args, **kwargs):
+    return render(request, template_name, {'post': post,
+                                           'comments': comments,
+                                           'new_comment': new_comment,
+                                           'comment_form': comment_form})
+# class PostDetail(generic.DetailView):
+#     """ Show single post """
+#     model = Post
+#     template_name = 'blog_app/post_detail.html'
+#
+#     def get(self, request, *args, **kwargs):
+#         self.object = self.get_object()
+#         if self.object.status:
+#             context = self.get_context_data(object=self.object)
+#             return self.render_to_response(context)
+#         else:
+#             raise Http404
+#             # return HttpResponse(status=404)
+
+    def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        if self.object.status:
-            context = self.get_context_data(object=self.object)
-            return self.render_to_response(context)
-        else:
-            raise Http404
-            # return HttpResponse(status=404)
+        comment_form = CommentForm(data=request.POST)
+        if comment_form.is_valid():
+            # Create Comment object but don't save to database yet
+            new_comment = comment_form.save(commit=False)
+            # Assign the current post to the comment
+            new_comment.post = self.object
+            # Save the comment to the database
+            new_comment.save()
 
 
 @login_required
