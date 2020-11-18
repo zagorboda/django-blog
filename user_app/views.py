@@ -1,14 +1,10 @@
 from django.http import Http404
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib.auth.forms import UserCreationForm
-# from django.http import HttpResponseRedirect
-# from django.contrib.auth.decorators import login_required
-# from django.views.generic.detail import DetailView
 from django.contrib.auth.models import User
-# from django.views import generic
 from django.contrib.auth import logout
 
-from blog_app.models import Post
+from blog_app.models import Post, Comment
 
 
 def signup_view(request):
@@ -41,6 +37,9 @@ def user_detail_view(request, name):
         context['user_profile'] = user
         posts_list = Post.objects.filter(author=user, status=1)
         context['posts_list'] = posts_list
+        if request.user == user:
+            comment_list = Comment.objects.filter(author=user)
+            context['comment_list'] = comment_list
         return render(request, "user_app/user_detail.html", context)
     except Exception as e:
         raise Http404

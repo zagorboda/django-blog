@@ -15,7 +15,6 @@ Including another URLconf
 """
 from django.urls import path, include
 from . import views
-# from django.contrib.auth.views import LoginView, PasswordResetDoneView, auth_logout
 
 app_name = 'user_app'
 urlpatterns = [

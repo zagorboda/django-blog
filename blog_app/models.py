@@ -1,6 +1,4 @@
 from django.db import models
-# from django.contrib.auth.models import User
-
 
 STATUS = (
     (0, "Draft"),
@@ -22,3 +20,19 @@ class Post(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Comment(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey('auth.User', related_name='comment_author', on_delete=models.CASCADE, default='')
+    # name = models.CharField(max_length=150)
+    # email = models.EmailField()
+    body = models.TextField()
+    created_on = models.DateTimeField(auto_now_add=True)
+    active = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['created_on']
+
+    def __str__(self):
+        return 'Comment {}'.format(self.body)

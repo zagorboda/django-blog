@@ -3,14 +3,55 @@
 {% block content %}
 
 {% if request.status != 404 %}
-
     <div class="container">
-        <div class="col-md-8 container mb-4 mt-3">
-            <h1>{% block title %} {{ object.title }} {% endblock title %}</h1>
+        <div class="col-md-12">
+            <h1>{% block title %} {{ post.title }} {% endblock title %}</h1>
             <p class="text-muted"><a href="{%url 'user_app:profile' post.author%}">{{ post.author }}</a> | {{ post.created_on }}</p>
-            <p align="justify">{{ object.content | safe }}</p>
+            <p align="justify">{{ post.content | linebreaks }}</p>
         </div>
     </div>
+
+    <hr>
+
+    {% if comments %}
+    <div class="container">
+        <div class="col-md-12">
+            {% for comment in comments %}
+                <div class="comments" style="padding: 10px;">
+                    <p class="font-weight-bold">
+                        <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
+                        <span class=" text-muted font-weight-normal">
+                            {{ comment.created_on }}
+                        </span>
+                    </p>
+                    {{ comment.body | linebreaks }}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+<!--    {% if request.session.message %}-->
+<!--        <p>{{request.session.message}}</p>-->
+<!--    {% endif %}-->
+
+    {% if comment_form %}
+
+        <div class="container">
+            <h3>Leave a comment</h3>
+                <form method="post" style="margin-top: 1.3em;" class="mb-3">
+                    {{ comment_form.as_p }}
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary  btn-lg">Submit</button>
+                </form>
+        </div>
+
+    {% else %}
+        <div class="container">
+            <p>You must be logged in to leave comments</p>
+        </div>
+
+    {% endif %}
 
 {% else %}
 
