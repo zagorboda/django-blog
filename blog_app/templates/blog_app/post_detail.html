@@ -19,7 +19,7 @@
             {% for comment in comments %}
                 <div class="comments" style="padding: 10px;">
                     <p class="font-weight-bold">
-                        {{ comment.author }}
+                        <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
                         <span class=" text-muted font-weight-normal">
                             {{ comment.created_on }}
                         </span>
