@@ -1,11 +1,13 @@
 from django.shortcuts import render
 from django.views import generic
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseRedirect, Http404
 from django.urls import reverse
+from django.contrib.auth.decorators import login_required, permission_required
+from django.shortcuts import get_object_or_404
+from django.http import HttpResponseRedirect, HttpResponse, Http404
+
 from django.template.defaultfilters import slugify
 
-from .forms import NewPostForm
+from .forms import NewPostForm, CommentForm
 from .models import Post
 
 from datetime import datetime
@@ -19,19 +21,72 @@ class PostList(generic.ListView):
 
 
 # TODO: return object only if it status==1, else 404
-class PostDetail(generic.DetailView):
-    """ Show single post """
-    model = Post
+def post_detail(request, slug):
     template_name = 'blog_app/post_detail.html'
+    post = get_object_or_404(Post, slug=slug, status=1)
+    comments = post.comments.filter(active=True)
 
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if self.object.status:
-            context = self.get_context_data(object=self.object)
-            return self.render_to_response(context)
+    # Comment posted
+    if request.method == 'POST':
+        comment_form = CommentForm(data=request.POST)
+        print(comment_form.data)
+        if comment_form.is_valid():
+            # Create Comment object but don't save to database yet
+            new_comment = comment_form.save(commit=False)
+
+            # Assign the current post adn author to the comment
+            new_comment.post = post
+            new_comment.author = request.user
+
+            # Save the comment to the database
+            new_comment.save()
+
+        # request.session['message'] = 'Your previous comment is awaiting moderation'
+
+        return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': slug}))
+    else:
+        # if request.COOKIES["postToken"] == 'allow':
+        #     comment_form = CommentForm()
+        # else:
+        #     setting_cookies = 'allow'
+        if request.user.is_authenticated:
+            comment_form = CommentForm()
         else:
-            raise Http404
-            # return HttpResponse(status=404)
+            comment_form = None
+
+    response = render(request, template_name, {'post': post,
+                                               'comments': comments,
+                                               'comment_form': comment_form})
+
+    # response.set_cookie("postToken", value=setting_cookies)
+
+    return response
+
+
+# class PostDetail(generic.DetailView):
+#     """ Show single post """
+#     model = Post
+#     template_name = 'blog_app/post_detail.html'
+#
+#     def get(self, request, *args, **kwargs):
+#         self.object = self.get_object()
+#         if self.object.status:
+#             context = self.get_context_data(object=self.object)
+#             return self.render_to_response(context)
+#         else:
+#             raise Http404
+#             # return HttpResponse(status=404)
+
+    # def post(self, request, *args, **kwargs):
+    #     self.object = self.get_object()
+    #     comment_form = CommentForm(data=request.POST)
+    #     if comment_form.is_valid():
+    #         # Create Comment object but don't save to database yet
+    #         new_comment = comment_form.save(commit=False)
+    #         # Assign the current post to the comment
+    #         new_comment.post = self.object
+    #         # Save the comment to the database
+    #         new_comment.save()
 
 
 @login_required
