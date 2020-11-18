@@ -4,7 +4,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.contrib.auth import logout
 
-from blog_app.models import Post
+from blog_app.models import Post, Comment
 
 
 def signup_view(request):
@@ -37,6 +37,9 @@ def user_detail_view(request, name):
         context['user_profile'] = user
         posts_list = Post.objects.filter(author=user, status=1)
         context['posts_list'] = posts_list
+        if request.user == user:
+            comment_list = Comment.objects.filter(author=user)
+            context['comment_list'] = comment_list
         return render(request, "user_app/user_detail.html", context)
     except Exception as e:
         raise Http404
