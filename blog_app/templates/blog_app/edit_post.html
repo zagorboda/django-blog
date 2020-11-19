@@ -1,0 +1,25 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+
+{% if not request.user.is_authenticated %}
+    <p>You must be logged in to add new post.</p>
+    <p><a href="{% url 'user_app:login'%}">Log in</a></p>
+
+{% else %}
+
+    {% if author_error_message %}
+        {{author_error_message}}
+    {% else %}
+
+    <form action="" method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="submit" value="Submit">
+    </form>
+
+    {% endif %}
+
+{% endif %}
+
+{% endblock content %}
