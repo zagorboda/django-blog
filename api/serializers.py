@@ -6,13 +6,46 @@ from blog_app.models import Post, Comment
 from django.contrib.auth.models import User
 
 
+class FilteredCommentSerializer(serializers.ListSerializer):
+
+    def to_representation(self, data):
+        data = data.filter(active=True)
+        return super(FilteredCommentSerializer, self).to_representation(data)
+
+
 class CommentSerializer(serializers.ModelSerializer):
     # author = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
 
     class Meta:
+        list_serializer_class = FilteredCommentSerializer
         model = Comment
         fields = ('author', 'body', 'created_on')
+
+
+    # def to_representation(self, instance):
+    #     qs = Comment.objects.filter(active=True)
+    #     print(qs)
+    #     serializer = CommentSerializer(instance=qs, many=True)
+    #     return qs
+        # ret = super().to_representation(instance)
+        # print(ret)
+        # ret['body'] = 'test change text'
+        # return ret
+
+        # data = Comment.objects.all()
+        # return super(CommentSerializer, self).to_representation(data)
+
+    # def validate(self, data):
+    #     errors = {}
+    #     body = data.get('body')
+    #     print(body)
+    #
+    #     if body:
+    #         errors['error'] = 'Empty comment'
+    #         raise serializers.ValidationError(errors)
+    #
+    #     return data
 
 
 class PostSerializer(serializers.HyperlinkedModelSerializer):
@@ -21,12 +54,43 @@ class PostSerializer(serializers.HyperlinkedModelSerializer):
     # owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
     # comments = serializers.HyperlinkedRelatedField(many=True, view_name='', read_only=True, lookup_field='slug')
     # comments = serializers.PrimaryKeyRelatedField(many=True, queryset=Comment.objects.all())
+    # comments = serializers.PrimaryKeyRelatedField(many=True, queryset=Comment.objects.filter(id=70))
 
-    comments = CommentSerializer(many=True)
+    # test_variable = serializers.SerializerMethodField()
+
+    comments = CommentSerializer(many=True, read_only=True)
+    # comments1 = serializers.SerializerMethodField()
+    # print(comments)
+
+    # comments = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
-        fields = ['url', 'id', 'title', 'content', 'slug', 'owner', 'created_on', 'comments']
+        fields = ('url', 'id', 'title', 'content', 'slug', 'owner', 'created_on', 'comments')
+
+    # def get_test_variable(self, obj):
+    #     return 100
+
+    # def get_comments(self, *args):
+    #     print(args)
+    #     qs = Comment.objects.filter(active=True)
+    #     # print(list(qs))
+    #     serializer = CommentSerializer(qs, many=True, read_only=True)
+    #     # print(serializer)
+    #     # return serializer.data
+    #     # return serializer
+
+    # def to_representation(self, instance):
+    #     qs = Comment.objects.filter(active=True)
+    #     serializer = CommentSerializer(instance=qs, many=True)
+    #     print(serializer.data)
+    #     return serializer.data
+
+    # def get_comments1(self, instance):
+    #     # Filter using the Car model instance and the CarType's related_name
+    #     # (which in this case defaults to car_types_set)
+    #     comments1_instances = instance.comments1_set.filter(status=1)
+    #     return CommentSerializer(comments1_instances, many=True).data
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

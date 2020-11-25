@@ -8,10 +8,12 @@ from .permissions import IsOwnerOrReadOnly
 from django.contrib.auth import logout
 from django.shortcuts import redirect
 
-from blog_app.models import Post
+from blog_app.models import Post, Comment
+from blog_app.forms import CommentForm
 # from user_app.models import CustomUser
 from django.contrib.auth.models import User
 
+from itertools import chain
 
 @api_view(['GET'])
 def api_root(request, format=None):
@@ -41,6 +43,26 @@ class PostDetail(generics.RetrieveAPIView):
                           IsOwnerOrReadOnly]
 
     lookup_field = 'slug'
+
+
+# class PostDetail(generics.ModelViewSet):
+#     permission_classes = [permissions.IsAuthenticatedOrReadOnly,
+#                           IsOwnerOrReadOnly]
+#     queryset = Post.objects.all().filter(status=1)
+#     serializer_class = PostSerializer
+#
+#     def retrieve(self, request, *args, **kwargs):
+#         # ret = super(StoryViewSet, self).retrieve(request)
+#         return Response({'key': 'single value'})
+
+
+    # def create(self, request):
+    #     model_form = CommentForm.BuildingForm(request.data)
+    #     if model_form.is_valid():
+    #         data = serializers.BuildingSerializer(obj).data
+    #         return Response(data, status=201)
+    #     else:
+    #         return Response({'errors': model_form.errors}, status=400)
 
 
 class UserList(generics.ListAPIView):
