@@ -1,4 +1,5 @@
-from rest_framework import serializers
+from django.core.paginator import Paginator
+from rest_framework import serializers, pagination
 
 from blog_app.models import Post, Comment
 
@@ -9,12 +10,13 @@ from django.contrib.auth.models import User
 class FilteredCommentSerializer(serializers.ListSerializer):
 
     def to_representation(self, data):
+        print(data)
         data = data.filter(active=True)
+        print(data)
         return super(FilteredCommentSerializer, self).to_representation(data)
 
 
 class CommentSerializer(serializers.ModelSerializer):
-    # author = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
 
     class Meta:
@@ -48,28 +50,59 @@ class CommentSerializer(serializers.ModelSerializer):
     #     return data
 
 
-class PostSerializer(serializers.HyperlinkedModelSerializer):
+class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
-    owner = serializers.ReadOnlyField(source='author.username')
+    author_username = serializers.ReadOnlyField(source='author.username')
+    author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
     # owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
     # comments = serializers.HyperlinkedRelatedField(many=True, view_name='', read_only=True, lookup_field='slug')
     # comments = serializers.PrimaryKeyRelatedField(many=True, queryset=Comment.objects.all())
     # comments = serializers.PrimaryKeyRelatedField(many=True, queryset=Comment.objects.filter(id=70))
 
-    # test_variable = serializers.SerializerMethodField()
+    test_variable = serializers.SerializerMethodField()
 
     comments = CommentSerializer(many=True, read_only=True)
     # comments1 = serializers.SerializerMethodField()
     # print(comments)
 
-    # comments = serializers.SerializerMethodField()
+    # comments = serializers.SerializerMethodField('paginated_comments')
 
     class Meta:
         model = Post
-        fields = ('url', 'id', 'title', 'content', 'slug', 'owner', 'created_on', 'comments')
+        fields = ('url', 'id', 'title', 'content', 'slug', 'author_username', 'author', 'created_on', 'comments', 'test_variable')
 
-    # def get_test_variable(self, obj):
-    #     return 100
+    # def paginated_comments(self, obj):
+    #     page_size = 10
+    #     paginator = Paginator(obj.comments.all(), page_size)
+    #     # print(paginator)
+    #     books = paginator.page(1)
+    #     serializer = CommentSerializer(books, many=True)
+    #     return serializer.data
+
+    # def paginated_comment(self, obj):
+    #     comments = Comment.objects.filter(active=True)
+    #     paginator = pagination.PageNumberPagination()
+    #     page = paginator.paginate_queryset(comments, self.context['request'])
+    #     serializer = CommentSerializer(page, many=True, context={'request': self.context['request']})
+    #     print(serializer)
+    #     # return serializer.data
+
+    # def paginated_comment(self, obj):
+    #     # page_size = self.context['request'].query_params.get('size') or 2
+    #     page_size = 2
+    #     paginator = Paginator(obj.comments.all(), page_size)
+    #     print(paginator)
+    #     page = self.context['request'].query_params.get('page') or 1
+    #     print(page)
+    #
+    #     comment = paginator.page(page)
+    #     print(comment)
+    #     serializer = CommentSerializer(comment, many=True)
+    #     print(serializer.data)
+    #     # return serializer.data
+
+    def get_test_variable(self, obj):
+        return 100
 
     # def get_comments(self, *args):
     #     print(args)
@@ -87,10 +120,18 @@ class PostSerializer(serializers.HyperlinkedModelSerializer):
     #     return serializer.data
 
     # def get_comments1(self, instance):
-    #     # Filter using the Car model instance and the CarType's related_name
-    #     # (which in this case defaults to car_types_set)
     #     comments1_instances = instance.comments1_set.filter(status=1)
     #     return CommentSerializer(comments1_instances, many=True).data
+
+
+class PostListSerializer(serializers.HyperlinkedModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
+    author_username = serializers.ReadOnlyField(source='author.username')
+    author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
+
+    class Meta:
+        model = Post
+        fields = ('url', 'id', 'title', 'content', 'slug', 'author_username', 'author', 'created_on')
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

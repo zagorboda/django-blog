@@ -20,7 +20,7 @@ urlpatterns = [
     path('blog/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
 
     path('user/logout/', views.logout_view, name='logout'),
-    path('user/', views.UserList.as_view(), name='user-list'),
+    # path('user/', views.UserList.as_view(), name='user-list'),
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
 
     path('api-auth/', include('rest_framework.urls')),

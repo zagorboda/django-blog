@@ -1,8 +1,9 @@
+from rest_framework.generics import GenericAPIView
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
-from .serializers import UserSerializer, PostSerializer
+from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer
 from rest_framework.response import Response
-from rest_framework import renderers, viewsets, generics, status, permissions
+from rest_framework import renderers, viewsets, generics, status, permissions, pagination
 from rest_framework.decorators import action, api_view
 from .permissions import IsOwnerOrReadOnly
 from django.contrib.auth import logout
@@ -14,36 +15,67 @@ from blog_app.forms import CommentForm
 from django.contrib.auth.models import User
 
 from itertools import chain
+from datetime import datetime
 
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({
-        'user': reverse('user-list', request=request, format=format),
+        # 'user': reverse('user-list', request=request, format=format),
         # 'posts': reverse('post-list', request=request, format=format),
         'blog': reverse('blog_main_page', request=request, format=format)
     })
 
 
-class PostList(generics.ListAPIView):
-    queryset = Post.objects.all().filter(status=1)
-    serializer_class = PostSerializer
+# class PostList(generics.ListAPIView):
+#     queryset = Post.objects.all().filter(status=1)
+#     serializer_class = PostListSerializer
+#
+#     # def perform_create(self, serializer):
+#     #     serializer.save(author=self.request.user)
+#
+#     # permission_classes = [permissions.IsAuthenticatedOrReadOnly,
+#     #                       IsOwnerOrReadOnly]
 
-    # def perform_create(self, serializer):
-    #     serializer.save(author=self.request.user)
+
+class PostDetail(GenericAPIView):
+
+    # serializer_class = PostDetailSerializer
 
     # permission_classes = [permissions.IsAuthenticatedOrReadOnly,
     #                       IsOwnerOrReadOnly]
 
+    # lookup_field = 'slug'
 
-class PostDetail(generics.RetrieveAPIView):
-    queryset = Post.objects.all().filter(status=1)
-    serializer_class = PostSerializer
+    # page_size = 2
 
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrReadOnly]
+    def get(self, request, slug, format=None):
+        # serializer_class = PostDetailSerializer
+        try:
+            queryset = Post.objects.get(slug=slug)
+            serializer = PostDetailSerializer(queryset, context={'request': request})
 
-    lookup_field = 'slug'
+            return Response(serializer.data)
+        except Post.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
+    def post(self, request, slug, format=None):
+        """Test comment"""
+        # serializer_class = CommentSerializer
+        serializer = CommentSerializer(data=request.data, context={'request': request})
+        if request.user.is_authenticated:
+            if serializer.is_valid():
+                post = Post.objects.get(slug=slug)
+                serializer.save(author=self.request.user, created_on=datetime.now(), post=post)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'detail': 'Credential was not provided'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return PostDetailSerializer
+        if self.request.method == 'POST':
+            return CommentSerializer
+        # return PostDetailSerializer
 
 # class PostDetail(generics.ModelViewSet):
 #     permission_classes = [permissions.IsAuthenticatedOrReadOnly,
@@ -65,9 +97,9 @@ class PostDetail(generics.RetrieveAPIView):
     #         return Response({'errors': model_form.errors}, status=400)
 
 
-class UserList(generics.ListAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+# class UserList(generics.ListAPIView):
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
 
 
 class UserDetail(generics.RetrieveAPIView):
@@ -79,7 +111,7 @@ class UserDetail(generics.RetrieveAPIView):
 
 class BlogMainPage(generics.ListAPIView):
     queryset = Post.objects.all().filter(status=1)
-    serializer_class = PostSerializer
+    serializer_class = PostListSerializer
 
 
 def logout_view(request):
