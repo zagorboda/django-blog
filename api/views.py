@@ -1,3 +1,5 @@
+from django.http import Http404
+from django.utils.text import slugify
 from rest_framework.generics import GenericAPIView
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -56,10 +58,12 @@ class PostDetail(GenericAPIView):
 
             return Response(serializer.data)
         except Post.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            # return Response(status=status.HTTP_404_NOT_FOUND)
+            raise Http404
 
     def post(self, request, slug, format=None):
-        """Test comment"""
+        """Add new comment to post"""
+
         # serializer_class = CommentSerializer
         serializer = CommentSerializer(data=request.data, context={'request': request})
         if request.user.is_authenticated:
@@ -114,9 +118,42 @@ class BlogMainPage(generics.ListAPIView):
     serializer_class = PostListSerializer
 
 
+class EditPost(APIView):
+
+    def get_object(self, slug):
+        try:
+            return Post.objects.get(slug=slug)
+        except Post.DoesNotExist:
+            raise Http404
+
+    def get(self, *args, **kwargs):
+        post = self.get_object(kwargs['slug'])
+        # print(self.request.user.id)
+        # print(post.author.id)
+        if self.request.user.is_authenticated and self.request.user.id == post.author.id:
+            serializer = PostDetailSerializer(post, context={'request': self.request})
+            return Response(serializer.data)
+        return Response({'detail': "You don't have permission to edit this post"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # def put(self, request, *args, **kwargs):
+    #     return self.update(request, *args, **kwargs)
+
+    def patch(self, request, slug, format=None):
+        post = self.get_object(slug)
+        if self.request.user.is_authenticated and self.request.user.id == post.author.id:
+            # request.data['slug'] = slugify(request.data['title'])
+            request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on))
+            serializer = PostDetailSerializer(post, data=request.data, context={'request': self.request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'detail': "You don't have permission to edit this post"}, status=status.HTTP_401_UNAUTHORIZED)
+
 def logout_view(request):
     logout(request)
     return redirect('blog_main_page')
+
 
 
     # def perform_create(self, serializer):

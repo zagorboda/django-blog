@@ -18,6 +18,7 @@ urlpatterns = [
 
     path('blog/', views.BlogMainPage.as_view(), name='blog_main_page'),
     path('blog/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
+    path('blog/<str:slug>/edit/', views.EditPost.as_view(), name='edit-post'),
 
     path('user/logout/', views.logout_view, name='logout'),
     # path('user/', views.UserList.as_view(), name='user-list'),

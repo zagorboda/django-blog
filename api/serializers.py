@@ -1,28 +1,24 @@
-from django.core.paginator import Paginator
+# from django.core.paginator import Paginator
 from rest_framework import serializers, pagination
-
-from blog_app.models import Post, Comment
-
-# from user_app.models import CustomUser
 from django.contrib.auth.models import User
 
+from blog_app.models import Post, Comment
 
 class FilteredCommentSerializer(serializers.ListSerializer):
 
     def to_representation(self, data):
-        print(data)
         data = data.filter(active=True)
-        print(data)
         return super(FilteredCommentSerializer, self).to_representation(data)
 
 
 class CommentSerializer(serializers.ModelSerializer):
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
+    author_username = serializers.ReadOnlyField(source='author.username')
 
     class Meta:
         list_serializer_class = FilteredCommentSerializer
         model = Comment
-        fields = ('author', 'body', 'created_on')
+        fields = ('author', 'author_username', 'body', 'created_on')
 
 
     # def to_representation(self, instance):
@@ -59,8 +55,6 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     # comments = serializers.PrimaryKeyRelatedField(many=True, queryset=Comment.objects.all())
     # comments = serializers.PrimaryKeyRelatedField(many=True, queryset=Comment.objects.filter(id=70))
 
-    test_variable = serializers.SerializerMethodField()
-
     comments = CommentSerializer(many=True, read_only=True)
     # comments1 = serializers.SerializerMethodField()
     # print(comments)
@@ -69,7 +63,11 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Post
-        fields = ('url', 'id', 'title', 'content', 'slug', 'author_username', 'author', 'created_on', 'comments', 'test_variable')
+        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on', 'comments')
+
+    # def get_is_owner(self, obj):
+    #     """Returns the is_owner field as a boolean"""
+    #     return self.context['request'].user.id == obj.user.id
 
     # def paginated_comments(self, obj):
     #     page_size = 10
@@ -101,9 +99,6 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     #     print(serializer.data)
     #     # return serializer.data
 
-    def get_test_variable(self, obj):
-        return 100
-
     # def get_comments(self, *args):
     #     print(args)
     #     qs = Comment.objects.filter(active=True)
@@ -129,9 +124,14 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
 
+    content = serializers.SerializerMethodField('get_short_content')
+
     class Meta:
         model = Post
         fields = ('url', 'id', 'title', 'content', 'slug', 'author_username', 'author', 'created_on')
+
+    def get_short_content(self, obj):
+        return obj.content[:200]
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
