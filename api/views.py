@@ -13,7 +13,6 @@ from django.shortcuts import redirect
 
 from blog_app.models import Post, Comment
 from blog_app.forms import CommentForm
-# from user_app.models import CustomUser
 from django.contrib.auth.models import User
 
 from itertools import chain
@@ -65,9 +64,12 @@ class PostDetail(GenericAPIView):
         """Add new comment to post"""
 
         # serializer_class = CommentSerializer
+        print('data = ', request.data)
         serializer = CommentSerializer(data=request.data, context={'request': request})
+        print(serializer)
         if request.user.is_authenticated:
             if serializer.is_valid():
+                print(serializer.validated_data)
                 post = Post.objects.get(slug=slug)
                 serializer.save(author=self.request.user, created_on=datetime.now(), post=post)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -138,11 +140,12 @@ class EditPost(APIView):
     # def put(self, request, *args, **kwargs):
     #     return self.update(request, *args, **kwargs)
 
+    # Title and content not empty, check this on client side
     def patch(self, request, slug, format=None):
         post = self.get_object(slug)
         if self.request.user.is_authenticated and self.request.user.id == post.author.id:
-            # request.data['slug'] = slugify(request.data['title'])
             request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on))
+            request.data['updated_on'] = datetime.now()
             serializer = PostDetailSerializer(post, data=request.data, context={'request': self.request})
             if serializer.is_valid():
                 serializer.save()
@@ -150,11 +153,10 @@ class EditPost(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response({'detail': "You don't have permission to edit this post"}, status=status.HTTP_401_UNAUTHORIZED)
 
+
 def logout_view(request):
     logout(request)
     return redirect('blog_main_page')
-
-
 
     # def perform_create(self, serializer):
     #     serializer.save(author=self.request.user)
