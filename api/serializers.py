@@ -3,6 +3,7 @@ from rest_framework import serializers, pagination
 from django.contrib.auth.models import User
 
 from blog_app.models import Post, Comment
+from rest_framework.reverse import reverse
 
 
 class FilteredCommentSerializer(serializers.ListSerializer):
@@ -18,7 +19,7 @@ class CommentSerializer(serializers.ModelSerializer):
     active = serializers.ReadOnlyField()
 
     class Meta:
-        list_serializer_class = FilteredCommentSerializer
+        # list_serializer_class = FilteredCommentSerializer
         model = Comment
         fields = ('author', 'author_username', 'body', 'created_on', 'active')
 
@@ -30,15 +31,21 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     # comments = CommentSerializer(many=True, read_only=True)
     comments = serializers.SerializerMethodField('get_active_comments')
+    # edit_url = serializers.HyperlinkedRelatedField(view_name='edit-post', read_only=True, lookup_field='slug')
+    edit_url = serializers.SerializerMethodField('get_edit_url')
 
     class Meta:
         model = Post
-        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on', 'comments')
+        fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on', 'comments')
 
     def get_active_comments(self, obj):
-        posts = Comment.objects.all().filter(active=1)
+        posts = Comment.objects.all().filter(active=1, post=obj)
         serializer = CommentSerializer(posts, many=True, context={'request': self.context['request']})
         return serializer.data
+
+    def get_edit_url(self, obj):
+        request = self.context['request']
+        return reverse('edit-post', kwargs={'slug': obj.slug}, request=request)
 
 
 class PostListSerializer(serializers.HyperlinkedModelSerializer):
@@ -63,8 +70,6 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     posts = serializers.SerializerMethodField('get_published_posts')
     comments = serializers.SerializerMethodField('get_comments')
 
-    # TODO : if other user make request, return only published posts, if owner make request return
-    #  all posts, marked as draft/posted(return status)
     def get_published_posts(self, user):
         if self.context['request'].user == user:
             posts = Post.objects.all().filter(author=user)
@@ -74,16 +79,11 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         return serializer.data
 
     def get_comments(self, user):
-        print('here')
         if self.context['request'].user == user:
-            print('here1')
             comments = Comment.objects.all().filter(author=user)
         else:
-            print('here2')
             comments = []
-        print('here3')
         serializer = CommentSerializer(comments, many=True, context={'request': self.context['request']})
-        print('here4')
         return serializer.data
 
     class Meta:

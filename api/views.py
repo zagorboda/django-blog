@@ -146,6 +146,7 @@ class EditPost(APIView):
         if self.request.user.is_authenticated and self.request.user.id == post.author.id:
             request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on))
             request.data['updated_on'] = datetime.now()
+            request.data['status'] = 0
             serializer = PostDetailSerializer(post, data=request.data, context={'request': self.request})
             if serializer.is_valid():
                 serializer.save()
