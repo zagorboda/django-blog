@@ -6,14 +6,8 @@ from blog_app.models import Post, Comment
 from rest_framework.reverse import reverse
 
 
-class FilteredCommentSerializer(serializers.ListSerializer):
-
-    def to_representation(self, data):
-        data = data.filter(active=True)
-        return super(FilteredCommentSerializer, self).to_representation(data)
-
-
 class CommentSerializer(serializers.ModelSerializer):
+    """ Serialize comments """
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
     author_username = serializers.ReadOnlyField(source='author.username')
     active = serializers.ReadOnlyField()
@@ -25,6 +19,7 @@ class CommentSerializer(serializers.ModelSerializer):
 
 
 class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
+    """ Serialize post, return list of comments """
     url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
@@ -39,16 +34,19 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on', 'comments')
 
     def get_active_comments(self, obj):
-        posts = Comment.objects.all().filter(active=1, post=obj)
+        """ Return only active comments (active=True) """
+        posts = Comment.objects.all().filter(active=True, post=obj)
         serializer = CommentSerializer(posts, many=True, context={'request': self.context['request']})
         return serializer.data
 
     def get_edit_url(self, obj):
+        """ Return url to edit-post view """
         request = self.context['request']
         return reverse('edit-post', kwargs={'slug': obj.slug}, request=request)
 
 
 class PostListSerializer(serializers.HyperlinkedModelSerializer):
+    """ Serialize posts; content length is 200 chars, don't return comments and edit_url"""
     url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
@@ -64,13 +62,15 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
+    """ Serialize user information """
     url = serializers.HyperlinkedIdentityField(view_name='user-detail', lookup_field='username')
     # posts = serializers.HyperlinkedRelatedField(many=True, view_name='post-detail', read_only=True,
     #                                             lookup_field='slug')
-    posts = serializers.SerializerMethodField('get_published_posts')
+    posts = serializers.SerializerMethodField('get_user_posts')
     comments = serializers.SerializerMethodField('get_comments')
 
-    def get_published_posts(self, user):
+    def get_user_posts(self, user):
+        """ Return all user posts if owner makes request, for other users return only published posts """
         if self.context['request'].user == user:
             posts = Post.objects.all().filter(author=user)
         else:
@@ -79,6 +79,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         return serializer.data
 
     def get_comments(self, user):
+        """ Return comments only if owner makes request """
         if self.context['request'].user == user:
             comments = Comment.objects.all().filter(author=user)
         else:
@@ -89,3 +90,10 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = User
         fields = ('url', 'id', 'username', 'posts', 'comments')
+
+
+# class FilteredCommentSerializer(serializers.ListSerializer):
+#     """ ListSerializer used to filter active comments """
+#     def to_representation(self, data):
+#         data = data.filter(active=True)
+#         return super(FilteredCommentSerializer, self).to_representation(data)
