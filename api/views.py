@@ -85,12 +85,12 @@ class EditPost(APIView):
         except Post.DoesNotExist:
             raise Http404
 
-    def get(self, *args, **kwargs):
+    def get(self, request, slug, format=None):
         """ Return detail post information """
 
-        post = self.get_object(kwargs['slug'])
+        post = self.get_object(slug)
         if self.request.user.is_authenticated and self.request.user.id == post.author.id:
-            serializer = PostDetailSerializer(post, context={'request': self.request})
+            serializer = PostDetailSerializer(post, context={'request': request})
             return Response(serializer.data)
         return Response({'detail': "You don't have permission to edit this post"},
                         status=status.HTTP_401_UNAUTHORIZED)
@@ -102,7 +102,7 @@ class EditPost(APIView):
             request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on))
             request.data['updated_on'] = datetime.now()
             request.data['status'] = 0
-            serializer = PostDetailSerializer(post, data=request.data, context={'request': self.request})
+            serializer = PostDetailSerializer(post, data=request.data, context={'request': request})
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
