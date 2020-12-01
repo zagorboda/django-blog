@@ -8,6 +8,9 @@ from rest_framework.response import Response
 from rest_framework import renderers, viewsets, generics, status, permissions, pagination
 from rest_framework.decorators import action, api_view
 
+from rest_framework.settings import api_settings
+from rest_framework.authtoken.views import ObtainAuthToken
+
 from blog_app.models import Post, Comment
 from django.contrib.auth.models import User
 
@@ -106,3 +109,7 @@ class EditPost(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response({'detail': "You don't have permission to edit this post"}, status=status.HTTP_401_UNAUTHORIZED)
 
+
+class UserLoginApiView(ObtainAuthToken):
+    """ Handle creating user authentication token """
+    renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES

@@ -12,5 +12,6 @@ urlpatterns = [
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
 
     path('api-auth/', include('rest_framework.urls')),
+    path('login/', views.UserLoginApiView.as_view()),
     path('', views.api_root),
 ]
