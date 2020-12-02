@@ -32,7 +32,7 @@ class PostDetail(GenericAPIView):
         """ Return object or 404 """
 
         try:
-            return Post.objects.get(slug=args[0])
+            return Post.objects.get(slug=args[0], status=1)
         except Post.DoesNotExist:
             raise Http404
 
