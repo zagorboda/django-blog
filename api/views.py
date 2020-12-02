@@ -110,6 +110,32 @@ class EditPost(APIView):
         return Response({'detail': "You don't have permission to edit this post"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
+class CreateNewPost(APIView):
+    def get(self, request):
+        print(self.request.user, request.user)
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request):
+        if request.user.is_authenticated:
+            request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'],request.user.username,datetime.now()))
+            serializer = PostDetailSerializer(data=request.data, context={'request': request})
+            if serializer.is_valid():
+                serializer.save(
+                    updated_on=datetime.now(),
+                    created_on=datetime.now(),
+                    status=0,
+                    author=self.request.user
+                )
+                # slug = slugify('{}-{}-{}'.format(
+                #     request.data['title'],
+                #     request.user.username,
+                #     datetime.now()))
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+
+
 class UserLoginApiView(ObtainAuthToken):
     """ Handle creating user authentication token """
     renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
