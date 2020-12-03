@@ -24,7 +24,27 @@ def api_root(request, format=None):
     })
 
 
+class CustomPagination(pagination.PageNumberPagination):
+    page = 1
+    page_size = 1
+    page_size_query_param = 'page_size'
+
+    def get_paginated_response(self, data):
+        return Response({
+            'links': {
+               'next': self.get_next_link(),
+               'previous': self.get_previous_link()
+            },
+            'count': self.page.paginator.count,
+            "custom_field": self.request.build_absolute_uri(reverse('new-post')),
+            'page': int(self.request.GET.get('page', 1)),  # can not set default = self.page
+            'page_size': int(self.request.GET.get('page_size', self.page_size)),
+            'results': data
+        })
+
+
 class PostDetail(GenericAPIView):
+    """ Return all information about post """
 
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
@@ -64,6 +84,7 @@ class PostDetail(GenericAPIView):
 
 
 class UserDetail(generics.RetrieveAPIView):
+    """ Return information about user """
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
@@ -71,11 +92,15 @@ class UserDetail(generics.RetrieveAPIView):
 
 
 class BlogMainPage(generics.ListAPIView):
+    """ Return most recent posts """
     queryset = Post.objects.all().filter(status=1)
     serializer_class = PostListSerializer
 
+    pagination_class = CustomPagination
+
 
 class EditPost(APIView):
+    """ Edit existing post """
     # permission_classes = (IsOwnerOrReadOnly, )
 
     def get_object(self, slug):
@@ -97,6 +122,7 @@ class EditPost(APIView):
 
     # Title and content not empty, check this on client side
     def patch(self, request, slug, format=None):
+        """ Edit post field """
         post = self.get_object(slug)
         if self.request.user.is_authenticated and self.request.user.id == post.author.id:
             request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on))
@@ -111,11 +137,14 @@ class EditPost(APIView):
 
 
 class CreateNewPost(APIView):
+    """ Create new post """
+
     def get(self, request):
         print(self.request.user, request.user)
-        return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_404_NOT_FOUND) # TODO
 
     def post(self, request):
+        """ Create new object """
         if request.user.is_authenticated:
             request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'],request.user.username,datetime.now()))
             serializer = PostDetailSerializer(data=request.data, context={'request': request})
@@ -126,14 +155,9 @@ class CreateNewPost(APIView):
                     status=0,
                     author=self.request.user
                 )
-                # slug = slugify('{}-{}-{}'.format(
-                #     request.data['title'],
-                #     request.user.username,
-                #     datetime.now()))
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_401_UNAUTHORIZED)
-
 
 
 class UserLoginApiView(ObtainAuthToken):
