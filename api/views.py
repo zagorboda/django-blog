@@ -1,9 +1,11 @@
 from django.http import Http404
 from django.utils.text import slugify
 from rest_framework.generics import GenericAPIView
+from rest_framework.permissions import AllowAny
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
-from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer
+from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, \
+    CreateUserSerializer, RegisterSerializer
 from rest_framework.response import Response
 from rest_framework import renderers, viewsets, generics, status, permissions, pagination
 from rest_framework.decorators import action, api_view
@@ -163,3 +165,23 @@ class CreateNewPost(APIView):
 class UserLoginApiView(ObtainAuthToken):
     """ Handle creating user authentication token """
     renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
+
+
+class UserCreateApiView(generics.CreateAPIView):
+    """ Creates the user. """
+    queryset = User.objects.all()
+    permission_classes = (AllowAny,)
+    serializer_class = RegisterSerializer
+
+    # def post(self, request, format=None):
+    #     """ Check and save new user """
+    #     print(request)
+    #     print(request.data)
+    #     serializer = CreateUserSerializer(data=request.data, context={'request': request})
+    #     if serializer.is_valid():
+    #         print(serializer.validated_data)
+    #         user = serializer.save()
+    #         if user:
+    #             return Response(serializer.data, status=status.HTTP_201_CREATED)
+    #         return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

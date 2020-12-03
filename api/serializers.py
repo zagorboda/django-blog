@@ -1,6 +1,8 @@
 # from django.core.paginator import Paginator
 from rest_framework import serializers, pagination
 from django.contrib.auth.models import User
+from rest_framework.validators import UniqueValidator
+from django.contrib.auth.password_validation import validate_password
 
 from blog_app.models import Post, Comment
 from rest_framework.reverse import reverse
@@ -90,6 +92,39 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = User
         fields = ('url', 'id', 'username', 'posts', 'comments')
+
+
+# class CreateUserSerializer(serializers.ModelSerializer):
+#     username = serializers.CharField(
+#             validators=[UniqueValidator(queryset=User.objects.all())]
+#             )
+#     password = serializers.CharField(min_length=8)
+#
+#     def create(self, validated_data):
+#         user = User.objects.create_user(validated_data['username'], '', validated_data['password'])
+#         return user
+#
+#     class Meta:
+#         model = User
+#         fields = ('id', 'password', 'username')
+#         extra_kwargs = {'password': {'write_only': True}}
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+
+    class Meta:
+        model = User
+        fields = ('username', 'password')
+
+    def create(self, validated_data):
+        user = User.objects.create(username=validated_data['username'])
+
+        user.set_password(validated_data['password'])
+        user.save()
+
+        return user
 
 
 # class FilteredCommentSerializer(serializers.ListSerializer):
