@@ -4,11 +4,11 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
-from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, \
-    CreateUserSerializer, RegisterSerializer
+from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterSerializer
 from rest_framework.response import Response
 from rest_framework import renderers, viewsets, generics, status, permissions, pagination
 from rest_framework.decorators import action, api_view
+from rest_framework.authtoken.models import Token
 
 from rest_framework.settings import api_settings
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -167,21 +167,25 @@ class UserLoginApiView(ObtainAuthToken):
     renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
 
 
-class UserCreateApiView(generics.CreateAPIView):
-    """ Creates the user. """
-    queryset = User.objects.all()
-    permission_classes = (AllowAny,)
-    serializer_class = RegisterSerializer
+# class UserCreateApiView(generics.CreateAPIView):
+#     """ Creates the user. """
+#     queryset = User.objects.all()
+#     permission_classes = (AllowAny,)
+#     serializer_class = RegisterSerializer
 
-    # def post(self, request, format=None):
-    #     """ Check and save new user """
-    #     print(request)
-    #     print(request.data)
-    #     serializer = CreateUserSerializer(data=request.data, context={'request': request})
-    #     if serializer.is_valid():
-    #         print(serializer.validated_data)
-    #         user = serializer.save()
-    #         if user:
-    #             return Response(serializer.data, status=status.HTTP_201_CREATED)
-    #         return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
-    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserCreateApiView(APIView):
+
+    def post(self, request, format=None):
+        """ Check and save new user """
+
+        serializer = RegisterSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            user = serializer.save()
+            if user:
+                token = Token.objects.create(user=user)
+                json = serializer.data
+                json['token'] = token.key
+                return Response(json, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
