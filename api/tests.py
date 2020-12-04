@@ -1,15 +1,16 @@
 from django.test import TestCase, Client
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, AnonymousUser
 from django.urls import reverse
 from rest_framework import status
-# from rest_framework.request import Request
 # from rest_framework.test import APIRequestFactory
+from django.test.client import RequestFactory
+from rest_framework.authtoken.models import Token
+from rest_framework.request import Request
 import json
 
-from rest_framework.authtoken.models import Token
-
-from .serializers import PostListSerializer, PostDetailSerializer, CommentSerializer
+from .serializers import PostListSerializer, PostDetailSerializer, CommentSerializer, UserSerializer
 from blog_app.models import Post, Comment
+from .views import UserDetail
 
 
 class EmptyBlogMainPageTest(TestCase):
@@ -115,8 +116,8 @@ class GetAllPostsOverPaginationTest(TestCase):
         result.extend(response.data['results'])
 
         # Collect data from paginated pages
-        while response.data['next']:
-            response = client.get(response.data['next'])
+        while response.data['links']['next']:
+            response = client.get(response.data['links']['next'])
 
             truncated_urls = []
             for item in response.data['results']:
@@ -247,8 +248,11 @@ class PostDetailTest(TestCase):
         comment = Comment.objects.get(post=self.post1)
         serializer = CommentSerializer(comment, context={'request': None})
 
+        number_of_comments = Comment.objects.all().count()
+
         self.assertEqual(serializer.data, response.data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(number_of_comments, 1)
 
     def test_invalid_comment_post_detail(self):
         """ Make POST request by authorized user with invalid data (empty body)"""
@@ -286,8 +290,11 @@ class PostDetailTest(TestCase):
         post = Post.objects.get(slug='single-comment-slug')
         serializer = PostDetailSerializer(post, context={'request': None})
 
+        number_of_comments = Comment.objects.all().filter(post=post).count()
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(number_of_comments, 1)
 
     def test_post_with_several_comments(self):
         """ Get post with several comments """
@@ -313,5 +320,198 @@ class PostDetailTest(TestCase):
         post = Post.objects.get(slug='several-comments-slug')
         serializer = PostDetailSerializer(post, context={'request': None})
 
+        number_of_comments = Comment.objects.all().filter(post=post).count()
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(number_of_comments, 10)
+
+
+class UserDetailTest(TestCase):
+    """ Test module for user detail page """
+    #  In this module I test User page. To get user data from db I need to use UserSerializer,
+    #  which inherits from HyperlinkedModelSerializer. HyperlinkedModelSerializer requires request
+    #  when initiating, and in UserSerializer I use self.context['request'].user == user, so I somehow
+    #  need a request to be passed to serializer. To make request I use RequestFactory(), then pass this
+    #  request into Request() class and then pass it to serializer.
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+        self.password = 'test_password'
+        self.user = User.objects.create_user(username='test_user')
+        self.user.set_password(self.password)
+        self.user.save()
+
+    def test_get_existing_user_detail(self):
+        """ Get detail for existing user without posts and comments"""
+        client = Client()
+        response = client.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+
+        # view = UserDetail.as_view()
+
+        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        # response = view(request, username='test_user')
+
+        test_request = Request(request)
+        # test_request.user = AnonymousUser()
+
+        user = User.objects.get(username='test_user')
+        serializer = UserSerializer(user, context={'request': test_request})
+
+        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_not_existing_user_detail(self):
+        """ Get detail for not existing user"""
+        client = Client()
+        response = client.get(reverse('user-detail', kwargs={'username': 'not_existing_user'}))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_post_request_to_user_detail(self):
+        client = Client()
+        response = client.post(reverse('user-detail', kwargs={'username': 'not_existing_user'}))
+
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_get_user_with_posts(self):
+        """ Test user with several active posts """
+        Post.objects.create(
+            title="Title",
+            content="Content",
+            author=self.user,
+            slug='slug',
+            status=1
+        )
+        Post.objects.create(
+            title="Title1",
+            content="Content1",
+            author=self.user,
+            slug='slug1',
+            status=1
+        )
+
+        client = Client()
+        response = client.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+
+        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+
+        test_request = Request(request)
+        # test_request.user = self.user
+
+        user = User.objects.get(username='test_user')
+        serializer = UserSerializer(user, context={'request': test_request})
+
+        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_user_with_different_posts(self):
+        """ Test user with active and draft posts. """
+        #  Factory request.user and Client request.user is AnonymousUser,
+        #  so data will include only single active post
+        Post.objects.create(
+            title="Title",
+            content="Content",
+            author=self.user,
+            slug='slug',
+            status=1
+        )
+        Post.objects.create(
+            title="Title1",
+            content="Content1",
+            author=self.user,
+            slug='slug1',
+            status=0
+        )
+
+        client = Client()
+        response = client.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+
+        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+
+        test_request = Request(request)
+
+        user = User.objects.get(username='test_user')
+        serializer = UserSerializer(user, context={'request': test_request})
+
+        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_user_with_comments_request_by_owner(self):
+        """ Test user with active and draft comments.
+        Comments shows only for owner, so client must be logged as owner"""
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=self.user,
+            slug='slug',
+            status=1
+        )
+
+        Comment.objects.create(
+            body="test comment",
+            post=test_post,
+            author=self.user,
+            active=1
+        )
+
+        Comment.objects.create(
+            body="test comment",
+            post=test_post,
+            author=self.user,
+            active=0
+        )
+
+        client = Client()
+        client.login(username=self.user.username, password=self.password)
+        token = Token.objects.create(user=self.user)
+
+        response = client.get(
+            reverse('user-detail', kwargs={'username': 'test_user'}),
+            HTTP_AUTHORIZATION='Token {}'.format(token)
+        )
+
+        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+
+        test_request = Request(request)
+        test_request.user = self.user
+
+        user = User.objects.get(username='test_user')
+        serializer = UserSerializer(user, context={'request': test_request})
+
+        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_user_with_comments_request_by_other_user(self):
+        """ Test user with active and draft comments.
+        Comments must be hidden for other users """
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=self.user,
+            slug='slug',
+            status=1
+        )
+
+        Comment.objects.create(
+            body="test comment",
+            post=test_post,
+            author=self.user,
+            active=1
+        )
+
+        client = Client()
+        response = client.get(
+            reverse('user-detail', kwargs={'username': 'test_user'})
+        )
+
+        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        test_request = Request(request)
+
+        user = User.objects.get(username='test_user')
+        serializer = UserSerializer(user, context={'request': test_request})
+
+        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+

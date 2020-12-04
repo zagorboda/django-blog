@@ -28,7 +28,7 @@ def api_root(request, format=None):
 
 class CustomPagination(pagination.PageNumberPagination):
     page = 1
-    page_size = 1
+    page_size = 10
     page_size_query_param = 'page_size'
 
     def get_paginated_response(self, data):
@@ -38,7 +38,7 @@ class CustomPagination(pagination.PageNumberPagination):
                'previous': self.get_previous_link()
             },
             'count': self.page.paginator.count,
-            "custom_field": self.request.build_absolute_uri(reverse('new-post')),
+            "create_new_post_url": self.request.build_absolute_uri(reverse('new-post')),
             'page': int(self.request.GET.get('page', 1)),  # can not set default = self.page
             'page_size': int(self.request.GET.get('page_size', self.page_size)),
             'results': data
