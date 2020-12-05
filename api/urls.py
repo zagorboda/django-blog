@@ -13,7 +13,7 @@ urlpatterns = [
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
 
     path('api-auth/', include('rest_framework.urls')),
-    path('login/', views.UserLoginApiView.as_view()),
-    path('signup/', views.UserCreateApiView.as_view()),
+    path('login/', views.UserLoginApiView.as_view(), name='login'),
+    path('signup/', views.UserCreateApiView.as_view(), name='signup'),
     path('', views.api_root),
 ]

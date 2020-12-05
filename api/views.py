@@ -1,20 +1,18 @@
+from django.contrib.auth.models import User
 from django.http import Http404
 from django.utils.text import slugify
-from rest_framework.generics import GenericAPIView
-from rest_framework.permissions import AllowAny
-from rest_framework.reverse import reverse
-from rest_framework.views import APIView
-from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterSerializer
-from rest_framework.response import Response
-from rest_framework import renderers, viewsets, generics, status, permissions, pagination
-from rest_framework.decorators import action, api_view
+from rest_framework import generics, status, permissions, pagination
 from rest_framework.authtoken.models import Token
-
-from rest_framework.settings import api_settings
 from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.decorators import api_view
+from rest_framework.generics import GenericAPIView
+from rest_framework.response import Response
+from rest_framework.reverse import reverse
+from rest_framework.settings import api_settings
+from rest_framework.views import APIView
 
 from blog_app.models import Post, Comment
-from django.contrib.auth.models import User
+from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterSerializer
 
 from datetime import datetime
 
@@ -47,6 +45,9 @@ class CustomPagination(pagination.PageNumberPagination):
             response_data['user_profile_url'] = self.request.build_absolute_uri(
                 reverse('user-detail', kwargs={'username': self.request.user})
             )
+        else:
+            response_data['login_url'] = self.request.build_absolute_uri(reverse('login'))
+            response_data['sign_up_url'] = self.request.build_absolute_uri(reverse('signup'))
 
         response_data['results'] = data
 
@@ -191,6 +192,9 @@ class UserLoginApiView(ObtainAuthToken):
 
 
 class UserCreateApiView(APIView):
+
+    def get(self, request):
+        return Response()
 
     def post(self, request, format=None):
         """ Check and save new user """

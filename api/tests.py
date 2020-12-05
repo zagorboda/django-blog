@@ -528,6 +528,7 @@ class CreateNewPost(TestCase):
         self.token = Token.objects.create(user=self.user)
 
     def test_post_request_by_unauthorized_user(self):
+        """ Make POST request by unauthorized user """
         client = Client()
 
         response = client.post(
@@ -539,6 +540,7 @@ class CreateNewPost(TestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_post_request_with_empty_data(self):
+        """ Make POST request without data """
         client = Client()
 
         client.login(username=self.user.username, password=self.password)
@@ -553,6 +555,7 @@ class CreateNewPost(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_post_request_with_valid_data(self):
+        """ Make POST request with valid data """
         client = Client()
 
         client.login(username=self.user.username, password=self.password)
@@ -567,6 +570,7 @@ class CreateNewPost(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_post_request_with_extra_fields(self):
+        """ Make POST request with valid data and several extra fields """
         client = Client()
 
         client.login(username=self.user.username, password=self.password)
@@ -583,3 +587,127 @@ class CreateNewPost(TestCase):
 
         self.assertEqual(post.status, 0)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class UserLoginApiTest(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+        self.password = 'test_password'
+        self.user = User.objects.create_user(username='test_user')
+        self.user.set_password(self.password)
+        self.user.save()
+
+        self.token = Token.objects.create(user=self.user)
+
+    def test_not_allowed_request(self):
+        """ Make GET request (ObtainAuthToken process only POST request) """
+        client = Client()
+        response = client.get(reverse('login'))
+
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_with_invalid_username(self):
+        """ Make POST request with invalid username """
+        client = Client()
+
+        response = client.post(
+            reverse('login'),
+            data=json.dumps({"username": "not_existing_username", "password": "some_password"}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_with_invalid_password(self):
+        """ Make POST request with invalid password """
+        client = Client()
+
+        response = client.post(
+            reverse('login'),
+            data=json.dumps({"username": self.user.username, "password": "invalid_password"}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_with_valid_credentials(self):
+        """ Make POST request with valid credentials for existing user """
+        client = Client()
+
+        response = client.post(
+            reverse('login'),
+            data=json.dumps({"username": self.user.username, "password": self.password}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(Token.objects.all()[0].key, response.data['token'])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class UserCreateApiTest(TestCase):
+    def test_get_request(self):
+        """ Make GET request """
+        client = Client()
+        response = client.get(reverse('signup'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_post_request_with_invalid_data(self):
+        """ Make POST request with invalid username """
+        client = Client()
+
+        response = client.post(
+            reverse('signup'),
+            data=json.dumps({"username": "!@#$%^&*()_+-=", "password": "test_password"}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_post_request_with_valid_data(self):
+        """ Make POST request with valid data """
+        client = Client()
+
+        response = client.post(
+            reverse('signup'),
+            data=json.dumps({"username": "valid_username", "password": "valid_password"}),
+            content_type='application/json'
+        )
+
+        user = User.objects.get(username='valid_username')
+        token = Token.objects.get(user=user)
+        # print(response.data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['username'], user.username)
+        self.assertEqual(response.data['token'], token.key)
+
+    def test_sign_up_existing_user(self):
+        """ Make POST request with existing username """
+        password = 'test_password'
+        user = User.objects.create_user(username='test_user')
+        user.set_password(password)
+        user.save()
+
+        client = Client()
+
+        response = client.post(
+            reverse('signup'),
+            data=json.dumps({"username": "test_user", "password": "some_Valid_Safe_password_2345dsS-dsaD"}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_sign_up_with_common_password(self):
+        """ Make POST request with existing username """
+        client = Client()
+
+        response = client.post(
+            reverse('signup'),
+            data=json.dumps({"username": "test_user", "password": "12345678"}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
