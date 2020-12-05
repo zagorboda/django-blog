@@ -116,3 +116,40 @@ def create_new_post(request):
     }
 
     return render(request, 'blog_app/new_post.html', context)
+
+
+@login_required
+def edit_post(request, slug):
+    """ View to edit created post """
+    old_post = get_object_or_404(Post, slug=slug)
+
+    if request.user == old_post.author:
+        if request.method == 'POST':
+            form = NewPostForm(request.POST)
+
+            if form.is_valid():
+                Post.objects.filter(slug=slug).update(
+                    title=form.cleaned_data['title'],
+                    slug=slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, old_post.created_on)),
+                    content=form.cleaned_data['content'],
+                    updated_on=datetime.now()
+                )
+
+                return HttpResponseRedirect(reverse('blog_app:home'))
+
+        else:
+            initial_dict = {
+                'title': old_post.title,
+                'content': old_post.content
+            }
+
+            form = NewPostForm(initial=initial_dict)
+
+        context = {
+            'form': form,
+        }
+
+    else:
+        context = {'author_error_message': 'You can edit only your posts'}
+
+    return render(request, 'blog_app/edit_post.html', context)
