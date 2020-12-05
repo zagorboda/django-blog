@@ -515,3 +515,71 @@ class UserDetailTest(TestCase):
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+
+class CreateNewPost(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+        self.password = 'test_password'
+        self.user = User.objects.create_user(username='test_user')
+        self.user.set_password(self.password)
+        self.user.save()
+
+        self.token = Token.objects.create(user=self.user)
+
+    def test_post_request_by_unauthorized_user(self):
+        client = Client()
+
+        response = client.post(
+            reverse('new-post'),
+            data=json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_post_request_with_empty_data(self):
+        client = Client()
+
+        client.login(username=self.user.username, password=self.password)
+
+        response = client.post(
+            reverse('new-post'),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            data=json.dumps({}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_post_request_with_valid_data(self):
+        client = Client()
+
+        client.login(username=self.user.username, password=self.password)
+
+        response = client.post(
+            reverse('new-post'),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            data=json.dumps({"title": "Test title", "content": "Test content"}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_post_request_with_extra_fields(self):
+        client = Client()
+
+        client.login(username=self.user.username, password=self.password)
+
+        response = client.post(
+            reverse('new-post'),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            data=json.dumps({"title": "Test title", "content": "Test content", "some_extra_field": "test value",
+                             "status": 1}),
+            content_type='application/json'
+        )
+
+        post = Post.objects.all()[0]
+
+        self.assertEqual(post.status, 0)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)

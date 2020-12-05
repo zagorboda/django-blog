@@ -32,17 +32,25 @@ class CustomPagination(pagination.PageNumberPagination):
     page_size_query_param = 'page_size'
 
     def get_paginated_response(self, data):
-        return Response({
+        response_data = {
             'links': {
                'next': self.get_next_link(),
                'previous': self.get_previous_link()
             },
             'count': self.page.paginator.count,
-            "create_new_post_url": self.request.build_absolute_uri(reverse('new-post')),
+            'create_new_post_url': self.request.build_absolute_uri(reverse('new-post')),
             'page': int(self.request.GET.get('page', 1)),  # can not set default = self.page
             'page_size': int(self.request.GET.get('page_size', self.page_size)),
-            'results': data
-        })
+        }
+
+        if self.request.user.is_authenticated:
+            response_data['user_profile_url'] = self.request.build_absolute_uri(
+                reverse('user-detail', kwargs={'username': self.request.user})
+            )
+
+        response_data['results'] = data
+
+        return Response(response_data)
 
 
 class PostDetail(GenericAPIView):
@@ -140,14 +148,22 @@ class EditPost(APIView):
 
 class CreateNewPost(APIView):
     """ Create new post """
+    serializer_class = PostDetailSerializer
 
     def get(self, request):
-        print(self.request.user, request.user)
-        return Response(status=status.HTTP_404_NOT_FOUND) # TODO
+        return Response()
+        # return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED) # TODO
 
     def post(self, request):
         """ Create new object """
         if request.user.is_authenticated:
+            # Check if fields not empty on client side ?
+            try:
+                _ = request.data['title']
+                _ = request.data['content']
+            except KeyError:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+
             request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'],request.user.username,datetime.now()))
             serializer = PostDetailSerializer(data=request.data, context={'request': request})
             if serializer.is_valid():
