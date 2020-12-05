@@ -701,7 +701,7 @@ class UserCreateApiTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_sign_up_with_common_password(self):
-        """ Make POST request with existing username """
+        """ Make POST request with common password """
         client = Client()
 
         response = client.post(
@@ -711,3 +711,121 @@ class UserCreateApiTest(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class EditPostTest(TestCase):
+    def setUp(self):
+        self.password = 'test_password'
+        self.user = User.objects.create_user(username='test_user')
+        self.user.set_password(self.password)
+        self.user.save()
+
+        self.token = Token.objects.create(user=self.user)
+
+        self.test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=self.user,
+            slug='slug',
+            status=1
+        )
+
+    def test_patch_request_to_existing_post_patch_all_fields(self):
+        """ Make PATCH request to existing post, patch title and content"""
+        client = Client()
+
+        response = client.patch(
+            reverse('edit-post', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            data=json.dumps({"title": "Test title", "content": "Test content"}),
+            content_type='application/json'
+        )
+
+        patched_post = Post.objects.all()[0]
+
+        self.assertEqual(response.data['slug'], patched_post.slug)
+        self.assertEqual(response.data['title'], patched_post.title)
+        self.assertEqual(response.data['content'], patched_post.content)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_patch_request_to_existing_post_patch_title(self):
+        """ Make PATCH request to existing post, patch title"""
+        client = Client()
+
+        response = client.patch(
+            reverse('edit-post', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            data=json.dumps({"title": "Test title", "content": self.test_post.content}),
+            content_type='application/json'
+        )
+
+        patched_post = Post.objects.all()[0]
+
+        self.assertEqual(response.data['slug'], patched_post.slug)
+        self.assertEqual(response.data['title'], patched_post.title)
+        self.assertEqual(response.data['content'], patched_post.content)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_patch_request_to_existing_post_patch_content(self):
+        """ Make PATCH request to existing post, patch content"""
+        client = Client()
+
+        response = client.patch(
+            reverse('edit-post', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            data=json.dumps({"content": "Test content", "title": self.test_post.title}),
+            content_type='application/json'
+        )
+
+        patched_post = Post.objects.all()[0]
+
+        self.assertEqual(response.data['slug'], patched_post.slug)
+        self.assertEqual(response.data['title'], patched_post.title)
+        self.assertEqual(response.data['content'], patched_post.content)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_request_to_existing_post(self):
+        """ Make GET request to existing post"""
+        client = Client()
+
+        response = client.get(
+            reverse('edit-post', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token)
+        )
+
+        patched_post = Post.objects.all()[0]
+
+        self.assertEqual(response.data['title'], patched_post.title)
+        self.assertEqual(response.data['content'], patched_post.content)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_patch_request_to_existing_post_by_unauthorized_user(self):
+        """ Make PATCH request to existing post by unauthorized user"""
+        client = Client()
+
+        response = client.patch(
+            reverse('edit-post', kwargs={'slug': 'slug'}),
+            data=json.dumps({"content": "Test content", "title": self.test_post.title}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_get_request_to_existing_post_by_not_owner(self):
+        """ Make GET request to existing post by not owner"""
+        password = 'test_password'
+        user = User.objects.create_user(username='new_user')
+        user.set_password(password)
+        user.save()
+
+        token = Token.objects.create(user=user)
+
+        client = Client()
+
+        response = client.get(
+            reverse('edit-post', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(token)
+        )
+
+        self.assertEqual(response.data['detail'], "You don't have permission to edit this post")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
