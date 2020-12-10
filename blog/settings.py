@@ -64,6 +64,7 @@ TEMPLATES = [
     },
 ]
 
+WSGI_APPLICATION = 'blog.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
@@ -74,8 +75,6 @@ DATABASES = {
         'PORT': env("DATABASE_PORT"),
     }
 }
-
-WSGI_APPLICATION = 'blog.wsgi.application'
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
@@ -160,7 +159,6 @@ if not DEBUG:
     WHITENOISE_USE_FINDERS = True
 else:
     SECURE_SSL_REDIRECT = False
-
 
 LOGGING = {
     'version': 1,
