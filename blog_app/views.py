@@ -6,6 +6,10 @@ from django.http import HttpResponseRedirect, HttpResponse, Http404
 from django.urls import reverse
 # from django.contrib import messages
 from django.template.defaultfilters import slugify
+from django.core.paginator import Paginator
+
+from django.contrib.postgres.search import SearchVector  # Search
+from django.db.models import Q  # Search
 
 from .forms import NewPostForm, CommentForm
 from .models import Post
@@ -18,6 +22,39 @@ class PostList(generic.ListView):
     paginate_by = 5
     queryset = Post.objects.filter(status=1).order_by('-created_on')[:10]
     template_name = 'blog_app/index.html'
+
+
+def search(request):
+    if 'q' in request.GET and request.GET.get('q'):
+        page = request.GET.get('page', 1)
+
+        query = request.GET.get('q')
+        posts = Post.objects.filter(title__icontains=query, status=1).order_by('title')
+        paginator = Paginator(posts, 3)
+        print('paginator = ', paginator)
+        posts = paginator.page(page)
+        print(posts)
+        return render(request, 'blog_app/search.html',
+                      {'post_list': posts, 'query': query})
+    else:
+        return render(request, 'blog_app/search.html')
+
+
+# class PostListSearch(generic.ListView):
+#     """ Show list of post that match search query """
+#     paginate_by = 5
+#     # queryset = Post.objects.filter(status=1).order_by('-created_on')[:10]
+#     template_name = 'blog_app/search.html'
+#
+#     def get_queryset(self, **kwargs):
+#         query = self.request.GET.get('q')
+#         return Post.objects.filter(
+#             title__icontains=query,
+#             status=1
+#         )
+#         # return Post.objects.annotate(
+#         #     search=SearchVector('title', ),
+#         # ).filter(search=query)
 
 
 # TODO: return object only if it status==1, else 404
