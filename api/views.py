@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.http import Http404
 from django.utils.text import slugify
-from rest_framework import generics, status, permissions, pagination
+from rest_framework import generics, status, permissions, pagination, filters
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view
@@ -108,6 +108,9 @@ class BlogMainPage(generics.ListAPIView):
     serializer_class = PostListSerializer
 
     pagination_class = CustomPagination
+
+    filter_backends = (filters.SearchFilter,)
+    search_fields = ('title',)
 
 
 class EditPost(APIView):

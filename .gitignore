@@ -1,3 +1,5 @@
-blog/settings.py
+staticfiles/
+
+blog/.env
 
 *.pyc
