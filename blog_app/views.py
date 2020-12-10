@@ -1,15 +1,13 @@
-from django.shortcuts import render
-from django.views import generic
-from django.contrib.auth.decorators import login_required, permission_required
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponseRedirect, HttpResponse, Http404
-from django.urls import reverse
-# from django.contrib import messages
-from django.template.defaultfilters import slugify
+from django.contrib.auth.decorators import login_required  # permission_required
 from django.core.paginator import Paginator
+from django.http import HttpResponseRedirect  # HttpResponse, Http404
+from django.shortcuts import render, get_object_or_404
+from django.template.defaultfilters import slugify
+from django.urls import reverse
+from django.views import generic
 
-from django.contrib.postgres.search import SearchVector  # Search
-from django.db.models import Q  # Search
+# from django.contrib.postgres.search import SearchVector  # Search
+# from django.db.models import Q  # Search
 
 from .forms import NewPostForm, CommentForm
 from .models import Post
@@ -25,18 +23,17 @@ class PostList(generic.ListView):
 
 
 def search(request):
-    if 'q' in request.GET and request.GET.get('q'):
-        page = request.GET.get('page', 1)
+    if request.method == 'GET':
+        if 'q' in request.GET and request.GET.get('q'):
+            page = request.GET.get('page', 1)
 
-        query = request.GET.get('q')
-        posts = Post.objects.filter(title__icontains=query, status=1).order_by('title')
-        paginator = Paginator(posts, 3)
-        print('paginator = ', paginator)
-        posts = paginator.page(page)
-        print(posts)
-        return render(request, 'blog_app/search.html',
-                      {'post_list': posts, 'query': query})
-    else:
+            query = request.GET.get('q')
+            posts = Post.objects.filter(title__icontains=query, status=1).order_by('-created_on')
+            paginator = Paginator(posts, 3)
+            posts = paginator.page(page)
+
+            return render(request, 'blog_app/search.html',
+                          {'post_list': posts, 'query': query})
         return render(request, 'blog_app/search.html')
 
 
