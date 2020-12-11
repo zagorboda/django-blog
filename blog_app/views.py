@@ -1,6 +1,6 @@
 from django.contrib.auth.decorators import login_required  # permission_required
 from django.core.paginator import Paginator
-from django.http import HttpResponseRedirect  # HttpResponse, Http404
+from django.http import HttpResponseRedirect, Http404  # HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.template.defaultfilters import slugify
 from django.urls import reverse
@@ -13,6 +13,17 @@ from .forms import NewPostForm, CommentForm
 from .models import Post
 
 from datetime import datetime
+
+
+class BlogPostCounterMixin(object):
+    def get_context_data(self, **kwargs):
+        context = super(BlogPostCounterMixin, self).get_context_data(**kwargs)
+        blog_post_slug = self.kwargs['slug']
+        if blog_post_slug not in self.request.session:
+            bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
+            # Insert the slug into the session as the user has seen it
+            self.request.session[blog_post_slug] = blog_post_slug
+        return context
 
 
 class PostList(generic.ListView):
@@ -54,7 +65,6 @@ def search(request):
 #         # ).filter(search=query)
 
 
-# TODO: return object only if it status==1, else 404
 def post_detail(request, slug):
     template_name = 'blog_app/post_detail.html'
     post = get_object_or_404(Post, slug=slug, status=1)
@@ -62,6 +72,7 @@ def post_detail(request, slug):
 
     # Comment posted
     if request.method == 'POST':
+        print(request.POST)
         comment_form = CommentForm(data=request.POST)
         print(comment_form.data)
         if comment_form.is_valid():
@@ -97,30 +108,43 @@ def post_detail(request, slug):
     return response
 
 
-# class PostDetail(generic.DetailView):
-#     """ Show single post """
-#     model = Post
-#     template_name = 'blog_app/post_detail.html'
-#
-#     def get(self, request, *args, **kwargs):
-#         self.object = self.get_object()
-#         if self.object.status:
-#             context = self.get_context_data(object=self.object)
-#             return self.render_to_response(context)
-#         else:
-#             raise Http404
-#             # return HttpResponse(status=404)
+class PostDetail(generic.DetailView):
+    """ Show single post """
+    model = Post
+    template_name = 'blog_app/post_detail.html'
 
-    # def post(self, request, *args, **kwargs):
-    #     self.object = self.get_object()
-    #     comment_form = CommentForm(data=request.POST)
-    #     if comment_form.is_valid():
-    #         # Create Comment object but don't save to database yet
-    #         new_comment = comment_form.save(commit=False)
-    #         # Assign the current post to the comment
-    #         new_comment.post = self.object
-    #         # Save the comment to the database
-    #         new_comment.save()
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.status:
+            context = self.get_context_data(object=self.object)
+            return self.render_to_response(context)
+        else:
+            raise Http404
+            # return HttpResponse(status=404)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        print(request.POST)
+        comment_form = CommentForm(data=request.POST)
+        if comment_form.is_valid():
+            # Create Comment object but don't save to database yet
+            new_comment = comment_form.save(commit=False)
+            # Assign the current post to the comment
+            new_comment.post = self.object
+            print(self.request.user)
+            new_comment.author = self.request.user
+            # Save the comment to the database
+            new_comment.save()
+        return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': kwargs['slug']}))
+
+    def get_context_data(self, **kwargs):
+        context = super(PostDetail, self).get_context_data(**kwargs)
+        blog_post_slug = self.kwargs['slug']
+        if blog_post_slug not in self.request.session:
+            bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
+            # Insert the slug into the session as the user has seen it
+            self.request.session[blog_post_slug] = blog_post_slug
+        return context
 
 
 @login_required

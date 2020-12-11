@@ -35,12 +35,12 @@
 <!--        <p>{{request.session.message}}</p>-->
 <!--    {% endif %}-->
 
-    {% if comment_form %}
+    {% if user.is_authenticated %}
 
         <div class="container">
             <h3>Leave a comment</h3>
                 <form method="post" style="margin-top: 1.3em;" class="mb-3">
-                    {{ comment_form.as_p }}
+                    <input type="text" name="body">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary  btn-lg">Submit</button>
                 </form>
