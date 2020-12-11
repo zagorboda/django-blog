@@ -829,3 +829,170 @@ class EditPostTest(TestCase):
 
         self.assertEqual(response.data['detail'], "You don't have permission to edit this post")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class SearchPostTest(TestCase):
+
+    def test_search_without_posts(self):
+        """ Make search request without any post created """
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=some_test_search')
+        )
+
+        self.assertEqual(response.data['results'], [])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_without_result(self):
+        """ Make search request with query, that doesn't match any existing post """
+        test_user = User.objects.create_user(username='test_user')
+
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=test_user,
+            slug='slug',
+            status=1
+        )
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=not_matching_pattern')
+        )
+
+        self.assertEqual(response.data['results'], [])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_with_single_result(self):
+        """ Make search request with query, that match single existing post """
+        test_user = User.objects.create_user(username='test_user')
+
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=test_user,
+            slug='slug',
+            status=1
+        )
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+        )
+
+        response.data['results'][0]['url'] = response.data['results'][0]['url'][17:]
+        response.data['results'][0]['author'] = response.data['results'][0]['author'][17:]
+
+        posts = Post.objects.filter(title__icontains='title', status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': None})
+
+        self.assertEqual(response.data['results'], serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_with_active_and_draft_results(self):
+        """ Make search request with query, that match both active and draft posts """
+        test_user = User.objects.create_user(username='test_user')
+
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=test_user,
+            slug='slug',
+            status=1
+        )
+        test_post = Post.objects.create(
+            title="Title",
+            content="draft",
+            author=test_user,
+            slug='draft-slug',
+            status=0
+        )
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+        )
+
+        response.data['results'][0]['url'] = response.data['results'][0]['url'][17:]
+        response.data['results'][0]['author'] = response.data['results'][0]['author'][17:]
+
+        posts = Post.objects.filter(title__icontains='title', status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': None})
+
+        self.assertEqual(response.data['results'], serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_with_several_results(self):
+        """ Make search request with query, that match several posts """
+        test_user = User.objects.create_user(username='test_user')
+
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=test_user,
+            slug='slug',
+            status=1
+        )
+        test_post = Post.objects.create(
+            title="Title",
+            content="draft",
+            author=test_user,
+            slug='draft-slug',
+            status=1
+        )
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+        )
+
+        for i in range(len(response.data['results'])):
+            response.data['results'][i]['url'] = response.data['results'][i]['url'][17:]
+            response.data['results'][i]['author'] = response.data['results'][i]['author'][17:]
+
+        posts = Post.objects.filter(title__icontains='title', status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': None})
+
+        self.assertEqual(response.data['results'], serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_with_results_over_pagination(self):
+        """ Make search request with query, that match number of posts, greater than page size """
+        test_user = User.objects.create_user(username='test_user')
+
+        for i in range(15):
+            Post.objects.create(
+                title="Title{}".format(i),
+                content="Content{}".format(i),
+                author=test_user,
+                slug='slug{}'.format(i),
+                status=1
+            )
+
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Truncate urls in result
+        for i in range(len(response.data['results'])):
+            response.data['results'][i]['url'] = response.data['results'][i]['url'][17:]
+            response.data['results'][i]['author'] = response.data['results'][i]['author'][17:]
+
+        result = [] # Collect data from response
+        result.extend(response.data['results'])
+
+        while response.data['links']['next']:
+            # Make request to next page if next page exists
+            response = client.get(response.data['links']['next'])
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+            # Truncate urls in result
+            for i in range(len(response.data['results'])):
+                response.data['results'][i]['url'] = response.data['results'][i]['url'][17:]
+                response.data['results'][i]['author'] = response.data['results'][i]['author'][17:]
+
+            # Collect data from response
+            result.extend(response.data['results'])
+
+        posts = Post.objects.filter(title__icontains='title', status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': None})
+
+        self.assertEqual(result, serializer.data)
