@@ -1,6 +1,10 @@
 {% extends 'layouts/base.html' %}
 
+{% load hitcount_tags %}
+
 {% block content %}
+
+{% get_hit_count for post %}
 
 {% if request.status != 404 %}
     <div class="container">

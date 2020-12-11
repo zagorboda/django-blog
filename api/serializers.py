@@ -10,10 +10,15 @@ class PostSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
     owner = serializers.ReadOnlyField(source='author.username')
     # owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
+    total_views = serializers.SerializerMethodField('get_hits_count')
+    print(total_views)
 
     class Meta:
         model = Post
-        fields = ['url', 'id', 'title', 'content', 'slug', 'owner', 'created_on']
+        fields = ['url', 'id', 'title', 'content', 'slug', 'owner', 'created_on', 'total_views']
+
+    def get_hits_count(self, obj):
+        return obj.hit_count.hits
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

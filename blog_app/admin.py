@@ -6,10 +6,16 @@ from .models import Post, Comment
 
 
 class PostAdmin(admin.ModelAdmin):
-    list_display = ('title', 'author', 'slug', 'status', 'created_on')
+    list_display = ('title', 'author', 'slug', 'status', 'created_on', 'formatted_hit_count')
     list_filter = ('status',)
     search_fields = ('title', 'content', 'author__username')
     prepopulated_fields = {'slug': ('title',)}
+
+    def formatted_hit_count(self, obj):
+        return obj.hit_count.hits if obj.hit_count.hits > 0 else 0
+
+    formatted_hit_count.admin_order_field = 'hit_count_generic__hit_count'
+    formatted_hit_count.short_description = 'Hits'
 
 
 class CommentAdmin(admin.ModelAdmin):

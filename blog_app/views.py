@@ -6,6 +6,8 @@ from django.template.defaultfilters import slugify
 from django.urls import reverse
 from django.views import generic
 
+from hitcount.views import HitCountDetailView
+
 # from django.contrib.postgres.search import SearchVector  # Search
 # from django.db.models import Q  # Search
 
@@ -65,58 +67,60 @@ def search(request):
 #         # ).filter(search=query)
 
 
-def post_detail(request, slug):
-    template_name = 'blog_app/post_detail.html'
-    post = get_object_or_404(Post, slug=slug, status=1)
-    comments = post.comments.filter(active=True)
+# def post_detail(request, slug):
+#     template_name = 'blog_app/post_detail.html'
+#     post = get_object_or_404(Post, slug=slug, status=1)
+#     comments = post.comments.filter(active=True)
+#
+#     # Comment posted
+#     if request.method == 'POST':
+#         print(request.POST)
+#         comment_form = CommentForm(data=request.POST)
+#         print(comment_form.data)
+#         if comment_form.is_valid():
+#             # Create Comment object but don't save to database yet
+#             new_comment = comment_form.save(commit=False)
+#
+#             # Assign the current post adn author to the comment
+#             new_comment.post = post
+#             new_comment.author = request.user
+#
+#             # Save the comment to the database
+#             new_comment.save()
+#
+#         # request.session['message'] = 'Your previous comment is awaiting moderation'
+#
+#         return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': slug}))
+#     else:
+#         # if request.COOKIES["postToken"] == 'allow':
+#         #     comment_form = CommentForm()
+#         # else:
+#         #     setting_cookies = 'allow'
+#         if request.user.is_authenticated:
+#             comment_form = CommentForm()
+#         else:
+#             comment_form = None
+#
+#     response = render(request, template_name, {'post': post,
+#                                                'comments': comments,
+#                                                'comment_form': comment_form})
+#
+#     # response.set_cookie("postToken", value=setting_cookies)
+#
+#     return response
 
-    # Comment posted
-    if request.method == 'POST':
-        print(request.POST)
-        comment_form = CommentForm(data=request.POST)
-        print(comment_form.data)
-        if comment_form.is_valid():
-            # Create Comment object but don't save to database yet
-            new_comment = comment_form.save(commit=False)
 
-            # Assign the current post adn author to the comment
-            new_comment.post = post
-            new_comment.author = request.user
-
-            # Save the comment to the database
-            new_comment.save()
-
-        # request.session['message'] = 'Your previous comment is awaiting moderation'
-
-        return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': slug}))
-    else:
-        # if request.COOKIES["postToken"] == 'allow':
-        #     comment_form = CommentForm()
-        # else:
-        #     setting_cookies = 'allow'
-        if request.user.is_authenticated:
-            comment_form = CommentForm()
-        else:
-            comment_form = None
-
-    response = render(request, template_name, {'post': post,
-                                               'comments': comments,
-                                               'comment_form': comment_form})
-
-    # response.set_cookie("postToken", value=setting_cookies)
-
-    return response
-
-
-class PostDetail(generic.DetailView):
+class PostDetail(HitCountDetailView):
     """ Show single post """
     model = Post
     template_name = 'blog_app/post_detail.html'
+    count_hit = True
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         if self.object.status:
             context = self.get_context_data(object=self.object)
+            print(context)
             return self.render_to_response(context)
         else:
             raise Http404
@@ -137,14 +141,14 @@ class PostDetail(generic.DetailView):
             new_comment.save()
         return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': kwargs['slug']}))
 
-    def get_context_data(self, **kwargs):
-        context = super(PostDetail, self).get_context_data(**kwargs)
-        blog_post_slug = self.kwargs['slug']
-        if blog_post_slug not in self.request.session:
-            bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
-            # Insert the slug into the session as the user has seen it
-            self.request.session[blog_post_slug] = blog_post_slug
-        return context
+    # def get_context_data(self, **kwargs):
+    #     context = super(PostDetail, self).get_context_data(**kwargs)
+    #     blog_post_slug = self.kwargs['slug']
+    #     if blog_post_slug not in self.request.session:
+    #         bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
+    #         # Insert the slug into the session as the user has seen it
+    #         self.request.session[blog_post_slug] = blog_post_slug
+    #     return context
 
 
 @login_required
