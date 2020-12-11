@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 
 from blog_app.models import Post, Comment
 from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterSerializer
+from .filters import DynamicSearchFilter
 
 from datetime import datetime
 
@@ -110,7 +111,9 @@ class BlogMainPage(generics.ListAPIView):
     pagination_class = CustomPagination
 
     filter_backends = (filters.SearchFilter,)
-    search_fields = ('title',)
+    search_fields = ('title', )
+
+    # filter_backends = (DynamicSearchFilter,)
 
 
 class EditPost(APIView):
