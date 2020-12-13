@@ -5,6 +5,7 @@ from django.shortcuts import render, get_object_or_404
 from django.template.defaultfilters import slugify
 from django.urls import reverse
 from django.views import generic
+from django.views.generic import RedirectView
 
 from hitcount.views import HitCountDetailView
 
@@ -108,6 +109,20 @@ def search(request):
 #     # response.set_cookie("postToken", value=setting_cookies)
 #
 #     return response
+
+
+class PostLikeToggle(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        slug = self.kwargs.get("slug")
+        obj = get_object_or_404(Post, slug=slug)
+        url_ = obj.get_absolute_url()
+        user = self.request.user
+        if user.is_authenticated:
+            if user in obj.likes.all():
+                obj.likes.remove(user)
+            else:
+                obj.likes.add(user)
+        return url_
 
 
 class PostDetail(HitCountDetailView):
