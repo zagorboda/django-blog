@@ -6,7 +6,7 @@ from rest_framework import renderers, viewsets, generics, status, permissions
 from rest_framework.decorators import action, api_view
 from .permissions import IsOwnerOrReadOnly
 from django.contrib.auth import logout
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 
 from blog_app.models import Post
 # from user_app.models import CustomUser
@@ -41,6 +41,32 @@ class PostDetail(generics.RetrieveAPIView):
                           IsOwnerOrReadOnly]
 
     lookup_field = 'slug'
+
+
+class PostLikeAPIToggle(APIView):
+    # authentication_classes = (authentication.SessionAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, slug, format=None):
+        # slug = self.kwargs.get("slug")
+        obj = get_object_or_404(Post, slug=slug)
+        # url_ = obj.get_absolute_url()
+        user = self.request.user
+        updated = False
+        liked = False
+        if user.is_authenticated:
+            if user in obj.likes.all():
+                liked = False
+                obj.likes.remove(user)
+            else:
+                liked = True
+                obj.likes.add(user)
+            updated = True
+        data = {
+            "updated": updated,
+            "liked": liked
+        }
+        return Response(data)
 
 
 class UserList(generics.ListAPIView):

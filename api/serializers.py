@@ -1,3 +1,4 @@
+from rest_framework.reverse import reverse
 from rest_framework import serializers
 
 from blog_app.models import Post
@@ -12,16 +13,21 @@ class PostSerializer(serializers.HyperlinkedModelSerializer):
     # owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
     total_views = serializers.SerializerMethodField('get_hits_count')
     total_likes = serializers.SerializerMethodField('get_likes')
+    like_url = serializers.SerializerMethodField('get_like_url')
 
     class Meta:
         model = Post
-        fields = ['url', 'id', 'title', 'content', 'slug', 'owner', 'created_on', 'total_views', 'total_likes']
+        fields = ['url', 'id', 'title', 'content', 'slug', 'owner', 'created_on', 'total_views', 'total_likes', 'like_url']
 
     def get_hits_count(self, obj):
         return obj.hit_count.hits
 
     def get_likes(self, obj):
         return obj.get_number_of_likes()
+
+    def get_like_url(self, obj):
+        request = self.context['request']
+        return reverse('post-like', kwargs={'slug': obj.slug}, request=request)
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
