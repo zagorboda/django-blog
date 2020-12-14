@@ -122,6 +122,7 @@ class PostLikeToggle(RedirectView):
                 obj.likes.remove(user)
             else:
                 obj.likes.add(user)
+        print(url_)
         return url_
 
 
@@ -135,6 +136,10 @@ class PostDetail(HitCountDetailView):
         self.object = self.get_object()
         if self.object.status:
             context = self.get_context_data(object=self.object)
+            if self.request.user in self.object.likes.all():
+                context['is_liked'] = True
+            else:
+                context['is_liked'] = False
             print(context)
             return self.render_to_response(context)
         else:
@@ -160,7 +165,7 @@ class PostDetail(HitCountDetailView):
     #     context = super(PostDetail, self).get_context_data(**kwargs)
     #     blog_post_slug = self.kwargs['slug']
     #     if blog_post_slug not in self.request.session:
-    #         bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
+    #         # bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
     #         # Insert the slug into the session as the user has seen it
     #         self.request.session[blog_post_slug] = blog_post_slug
     #     return context

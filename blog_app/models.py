@@ -32,7 +32,7 @@ class Post(models.Model, HitCountMixin):
     def get_like_url(self):
         return reverse("blog_app:post_like", kwargs={"slug": self.slug})
 
-    def get_number_of_likes(self, obj):
+    def get_number_of_likes(self):
         return self.likes.count()
 
     # def current_hit_count(self):
