@@ -201,6 +201,7 @@ class PostDetailTest(TestCase):
         response.data['url'] = response.data['url'][17:]
         response.data['edit_url'] = response.data['edit_url'][17:]
         response.data['author'] = response.data['author'][17:]
+        response.data['like_url'] = response.data['like_url'][17:]
 
         post = Post.objects.get(slug='slug')
         serializer = PostDetailSerializer(post, context={'request': None})
@@ -286,6 +287,7 @@ class PostDetailTest(TestCase):
         response.data['edit_url'] = response.data['edit_url'][17:]
         response.data['author'] = response.data['author'][17:]
         response.data['comments'][0]['author'] = response.data['comments'][0]['author'][17:]
+        response.data['like_url'] = response.data['like_url'][17:]
 
         post = Post.objects.get(slug='single-comment-slug')
         serializer = PostDetailSerializer(post, context={'request': None})
@@ -313,6 +315,7 @@ class PostDetailTest(TestCase):
         response.data['url'] = response.data['url'][17:]
         response.data['edit_url'] = response.data['edit_url'][17:]
         response.data['author'] = response.data['author'][17:]
+        response.data['like_url'] = response.data['like_url'][17:]
 
         for comment in response.data['comments']:
             comment['author'] = comment['author'][17:]

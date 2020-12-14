@@ -1,4 +1,9 @@
 staticfiles/
+<<<<<<< HEAD
+
+blog/.env
+=======
+>>>>>>> blog
 
 blog/.env
 

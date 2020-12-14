@@ -16,6 +16,17 @@ from .serializers import UserSerializer, PostListSerializer, PostDetailSerialize
 from .filters import DynamicSearchFilter
 
 from datetime import datetime
+from .serializers import UserSerializer, PostDetailSerializer, PostListSerializer
+from rest_framework.response import Response
+from rest_framework import renderers, viewsets, generics, status, permissions
+from rest_framework.decorators import action, api_view
+# from .permissions import IsOwnerOrReadOnly
+# from django.contrib.auth import logout
+from django.shortcuts import redirect, get_object_or_404
+
+from blog_app.models import Post
+# from user_app.models import CustomUser
+from django.contrib.auth.models import User
 
 
 @api_view(['GET'])
@@ -57,7 +68,6 @@ class CustomPagination(pagination.PageNumberPagination):
 
 class PostDetail(GenericAPIView):
     """ Return all information about post """
-
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_object(self, *args, **kwargs):
@@ -86,6 +96,7 @@ class PostDetail(GenericAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
     def get_serializer_class(self):
         """ Return serializer class for different requests """
         if self.request.method == 'GET':
@@ -93,6 +104,36 @@ class PostDetail(GenericAPIView):
         if self.request.method == 'POST':
             return CommentSerializer
         return PostDetailSerializer
+
+class PostLikeAPIToggle(APIView):
+    # authentication_classes = (authentication.SessionAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, slug, format=None):
+        # slug = self.kwargs.get("slug")
+        obj = get_object_or_404(Post, slug=slug)
+        # url_ = obj.get_absolute_url()
+        user = self.request.user
+        updated = False
+        liked = False
+        if user.is_authenticated:
+            if user in obj.likes.all():
+                liked = False
+                obj.likes.remove(user)
+            else:
+                liked = True
+                obj.likes.add(user)
+            updated = True
+        data = {
+            "updated": updated,
+            "liked": liked
+        }
+        return Response(data)
+
+
+class UserList(generics.ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
 
 class UserDetail(generics.RetrieveAPIView):

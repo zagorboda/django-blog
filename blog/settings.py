@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'django_extensions',
     'rest_framework.authtoken',
     'whitenoise.runserver_nostatic',
+    'hitcount',
 
     'django.contrib.admin',
     'django.contrib.auth',

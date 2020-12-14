@@ -1,8 +1,10 @@
 # from django.core.paginator import Paginator
 from rest_framework import serializers, pagination
 from django.contrib.auth.models import User
-from rest_framework.validators import UniqueValidator
+# from rest_framework.validators import UniqueValidator
 from django.contrib.auth.password_validation import validate_password
+# from rest_framework.reverse import reverse
+from rest_framework import serializers
 
 from blog_app.models import Post, Comment
 from rest_framework.reverse import reverse
@@ -40,9 +42,14 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     # edit_url = serializers.HyperlinkedRelatedField(view_name='edit-post', read_only=True, lookup_field='slug')
     edit_url = serializers.SerializerMethodField('get_edit_url')
 
+    total_views = serializers.SerializerMethodField('get_hits_count')
+    total_likes = serializers.SerializerMethodField('get_likes')
+    like_url = serializers.SerializerMethodField('get_like_url')
+
     class Meta:
         model = Post
-        fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on', 'comments')
+        fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
+                  'created_on', 'comments', 'total_views', 'total_likes', 'like_url')
 
     def get_active_comments(self, obj):
         """ Return only active comments (active=True) """
@@ -54,6 +61,16 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         """ Return url to edit-post view """
         request = self.context['request']
         return reverse('edit-post', kwargs={'slug': obj.slug}, request=request)
+
+    def get_hits_count(self, obj):
+        return obj.hit_count.hits
+
+    def get_likes(self, obj):
+        return obj.get_number_of_likes()
+
+    def get_like_url(self, obj):
+        request = self.context['request']
+        return reverse('post-like', kwargs={'slug': obj.slug}, request=request)
 
     # def get_field_names(self, *args, **kwargs):
     #     field_names = self.context.get('fields', None)
@@ -69,14 +86,26 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
 
+    total_views = serializers.SerializerMethodField('get_hits_count')
     content = serializers.SerializerMethodField('get_short_content')
 
     class Meta:
         model = Post
-        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on')
+        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on',
+                  'total_views')
 
     def get_short_content(self, obj):
         return obj.content[:200]
+
+    def get_hits_count(self, obj):
+        return obj.hit_count.hits
+
+    def get_likes(self, obj):
+        return obj.get_number_of_likes()
+
+    def get_like_url(self, obj):
+        request = self.context['request']
+        return reverse('post-like', kwargs={'slug': obj.slug}, request=request)
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
