@@ -680,7 +680,6 @@ class UserCreateApiTest(TestCase):
 
         user = User.objects.get(username='valid_username')
         token = Token.objects.get(user=user)
-        # print(response.data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['username'], user.username)
@@ -999,3 +998,88 @@ class SearchPostTest(TestCase):
         serializer = PostListSerializer(posts, many=True, context={'request': None})
 
         self.assertEqual(result, serializer.data)
+
+
+class PostLikesTest(TestCase):
+    def setUp(self):
+        self.password = 'test_password'
+        self.user = User.objects.create_user(username='test_user')
+        self.user.set_password(self.password)
+        self.user.save()
+
+        self.token = Token.objects.create(user=self.user)
+
+        self.post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=self.user,
+            slug='slug',
+            status=1
+        )
+
+        self.client = Client()
+
+    def test_no_likes(self):
+        response = self.client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+        )
+        self.assertEqual(response.data['total_likes'], 0)
+
+    def test_like_url_with_invalid_slug(self):
+        response = self.client.get(
+            reverse('post-like', kwargs={'slug': 'invalid_slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_like_url_with_unauthorised_user(self):
+        client = Client()
+        response = client.get(
+            reverse('post-like', kwargs={'slug': 'slug'}),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_like_url_with_authorised_user(self):
+        response = self.client.get(
+            reverse('post-like', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+        )
+
+        post = Post.objects.get(slug='slug')
+        self.assertEqual(post.likes.count(), 1)
+        self.assertEqual(response.data, {'updated': True, 'liked': True})
+        response = self.client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+        )
+        self.assertEqual(response.data['total_likes'], 1)
+
+    def test_like_url_with_several_get_request(self):
+        response = self.client.get(  # First request
+            reverse('post-like', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+        )
+        self.assertEqual(response.data, {'updated': True, 'liked': True})
+
+        post = Post.objects.get(slug='slug')
+        self.assertEqual(post.likes.count(), 1)
+
+        response = self.client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+        )
+        self.assertEqual(response.data['total_likes'], 1)
+
+        response = self.client.get(  # Second request
+            reverse('post-like', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+        )
+        self.assertEqual(response.data, {'updated': True, 'liked': False})
+
+        post = Post.objects.get(slug='slug')
+        self.assertEqual(post.likes.count(), 0)
+
+        response = self.client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+        )
+        self.assertEqual(response.data['total_likes'], 0)

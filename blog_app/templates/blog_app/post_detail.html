@@ -49,11 +49,15 @@
             <p class="text-muted"><a href="{%url 'user_app:profile' post.author%}">{{ post.author }}</a> | {{ post.created_on }}</p>
             <p class="text-muted"> Views: {% get_hit_count for post %} </p> <p id="likes"> Likes: <span id="likes_count"> {{ object.likes.count }} </span></p>
 
+            {% if user.is_authenticated %}
+
                 {% if is_liked %}
                     <button class="btn btn-primary" name="like" id="like2" onclick="make_ajax_request(this)">Remove like</button>
                 {% else %}
                     <button class="btn btn-primary" name="like" id="like1" onclick="make_ajax_request(this)">Like</button>
                 {% endif %}
+
+            {% endif %}
 
             <p align="justify">{{ post.content | linebreaks }}</p>
         </div>

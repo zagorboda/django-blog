@@ -122,7 +122,6 @@ class PostLikeToggle(RedirectView):
                 obj.likes.remove(user)
             else:
                 obj.likes.add(user)
-        print(url_)
         return url_
 
 
@@ -140,7 +139,6 @@ class PostDetail(HitCountDetailView):
                 context['is_liked'] = True
             else:
                 context['is_liked'] = False
-            print(context)
             return self.render_to_response(context)
         else:
             raise Http404
@@ -148,14 +146,12 @@ class PostDetail(HitCountDetailView):
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        print(request.POST)
         comment_form = CommentForm(data=request.POST)
         if comment_form.is_valid():
             # Create Comment object but don't save to database yet
             new_comment = comment_form.save(commit=False)
             # Assign the current post to the comment
             new_comment.post = self.object
-            print(self.request.user)
             new_comment.author = self.request.user
             # Save the comment to the database
             new_comment.save()

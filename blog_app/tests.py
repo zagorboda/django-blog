@@ -158,9 +158,6 @@ class NewPostPageTests(TestCase):
     #         'content': 'Some new text'
     #     }
     #     response = self.client.post(reverse('blog_app:new_post'), json=data)
-    #     print(response)
-    #     print(User.objects.all())
-    #     print(Post.objects.all())
     #     self.assertEquals(response.status_code, 200)
 
 
