@@ -8,7 +8,8 @@ from django.contrib.contenttypes.fields import GenericRelation
 
 STATUS = (
     (0, "Draft"),
-    (1, "Publish")
+    (1, "Publish"),
+    (2, "Delete")
 )
 
 
@@ -21,7 +22,6 @@ class Post(models.Model, HitCountMixin):
     content = models.TextField()
     created_on = models.DateTimeField(auto_now_add=True)
     status = models.IntegerField(choices=STATUS, default=0)
-    # total_views = models.ForeignKey(Hits, related_name='total_views', on_delete=models.CASCADE, default=None)
     hit_count_generic = GenericRelation(HitCount, object_id_field='object_pk',
                                         related_query_name='hit_count_generic_relation')
     likes = models.ManyToManyField('auth.User', blank=True, related_name='post_likes')
@@ -48,8 +48,6 @@ class Post(models.Model, HitCountMixin):
 class Comment(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
     author = models.ForeignKey('auth.User', related_name='comment_author', on_delete=models.CASCADE, default='')
-    # name = models.CharField(max_length=150)
-    # email = models.EmailField()
     body = models.TextField()
     created_on = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=False)
@@ -59,3 +57,12 @@ class Comment(models.Model):
 
     def __str__(self):
         return 'Comment {}'.format(self.body)
+
+
+class ReportPost(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='report_post')
+    reports = models.ManyToManyField('auth.User', blank=True, related_name='post_reports', default=0)
+    total_reports = models.IntegerField(default=0)
+
+    def get_number_of_reports(self):
+        return self.reports.count()

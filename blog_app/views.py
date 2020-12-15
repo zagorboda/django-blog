@@ -13,7 +13,7 @@ from hitcount.views import HitCountDetailView
 # from django.db.models import Q  # Search
 
 from .forms import NewPostForm, CommentForm
-from .models import Post
+from .models import Post, ReportPost
 
 from datetime import datetime
 
@@ -122,6 +122,31 @@ class PostLikeToggle(RedirectView):
                 obj.likes.remove(user)
             else:
                 obj.likes.add(user)
+        print(url_)
+        return url_
+
+
+class PostReportToggle(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        slug = self.kwargs.get("slug")
+        post = get_object_or_404(Post, slug=slug)
+        url_ = post.get_absolute_url()
+        user = self.request.user
+        if user.is_authenticated:
+            if ReportPost.objects.filter(post=post).exists():
+                report = ReportPost.objects.get(post=post)
+                print(report.reports.all())
+                if not report.reports.filter(username=user.username).exists():
+                    report.total_reports += 1
+                    report.reports.add(user)
+                    report.save()
+                    print(report.total_reports)
+            else:
+                report = ReportPost.objects.create(post=post)
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+                print(report.total_reports)
         print(url_)
         return url_
 
