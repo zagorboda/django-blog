@@ -29,6 +29,10 @@ from blog_app.models import Post
 from django.contrib.auth.models import User
 
 
+from rest_framework_swagger.views import get_swagger_view
+schema_view = get_swagger_view(title='Blog API')
+
+
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({
