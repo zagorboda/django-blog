@@ -8,12 +8,10 @@ from django.contrib.contenttypes.fields import GenericRelation
 
 STATUS = (
     (0, "Draft"),
-    (1, "Publish"),
-    (2, "Delete")
+    (1, "Publish")
 )
 
 
-# @python_2_unicode_compatible
 class Post(models.Model, HitCountMixin):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True)

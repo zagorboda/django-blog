@@ -18,6 +18,9 @@ from .models import Post, ReportPost
 from datetime import datetime
 
 
+
+
+
 class BlogPostCounterMixin(object):
     def get_context_data(self, **kwargs):
         context = super(BlogPostCounterMixin, self).get_context_data(**kwargs)
@@ -122,7 +125,6 @@ class PostLikeToggle(RedirectView):
                 obj.likes.remove(user)
             else:
                 obj.likes.add(user)
-        print(url_)
         return url_
 
 
@@ -135,19 +137,15 @@ class PostReportToggle(RedirectView):
         if user.is_authenticated:
             if ReportPost.objects.filter(post=post).exists():
                 report = ReportPost.objects.get(post=post)
-                print(report.reports.all())
                 if not report.reports.filter(username=user.username).exists():
                     report.total_reports += 1
                     report.reports.add(user)
                     report.save()
-                    print(report.total_reports)
             else:
                 report = ReportPost.objects.create(post=post)
                 report.total_reports += 1
                 report.reports.add(user)
                 report.save()
-                print(report.total_reports)
-        print(url_)
         return url_
 
 
@@ -165,7 +163,6 @@ class PostDetail(HitCountDetailView):
                 context['is_liked'] = True
             else:
                 context['is_liked'] = False
-            print(context)
             return self.render_to_response(context)
         else:
             raise Http404
@@ -173,14 +170,12 @@ class PostDetail(HitCountDetailView):
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        print(request.POST)
         comment_form = CommentForm(data=request.POST)
         if comment_form.is_valid():
             # Create Comment object but don't save to database yet
             new_comment = comment_form.save(commit=False)
             # Assign the current post to the comment
             new_comment.post = self.object
-            print(self.request.user)
             new_comment.author = self.request.user
             # Save the comment to the database
             new_comment.save()

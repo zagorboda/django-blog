@@ -1,6 +1,5 @@
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
-from .serializers import UserSerializer, PostSerializer
 from rest_framework.response import Response
 from rest_framework import renderers, viewsets, generics, status, permissions
 from rest_framework.decorators import action, api_view
@@ -8,9 +7,17 @@ from .permissions import IsOwnerOrReadOnly
 from django.contrib.auth import logout
 from django.shortcuts import redirect, get_object_or_404
 
+
 from blog_app.models import Post
+from .serializers import UserSerializer, PostSerializer
 # from user_app.models import CustomUser
 from django.contrib.auth.models import User
+from django.conf.urls import url
+
+
+from rest_framework_swagger.views import get_swagger_view
+
+schema_view = get_swagger_view(title='Blog API')
 
 
 @api_view(['GET'])
@@ -23,6 +30,7 @@ def api_root(request, format=None):
 
 
 class PostList(generics.ListAPIView):
+    """ Return list of posts """
     queryset = Post.objects.all().filter(status=1)
     serializer_class = PostSerializer
 
@@ -34,6 +42,7 @@ class PostList(generics.ListAPIView):
 
 
 class PostDetail(generics.RetrieveAPIView):
+    """ Retrieve detail information about post """
     queryset = Post.objects.all().filter(status=1)
     serializer_class = PostSerializer
 
@@ -44,6 +53,7 @@ class PostDetail(generics.RetrieveAPIView):
 
 
 class PostLikeAPIToggle(APIView):
+    """ View to like/unlike post """
     # authentication_classes = (authentication.SessionAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -82,6 +92,7 @@ class UserDetail(generics.RetrieveAPIView):
 
 
 class BlogMainPage(generics.ListAPIView):
+    """ Return posts to display on main page"""
     queryset = Post.objects.all().filter(status=1)
     serializer_class = PostSerializer
 

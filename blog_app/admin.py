@@ -19,6 +19,7 @@ class PostAdmin(admin.ModelAdmin):
     formatted_hit_count.short_description = 'Hits'
 
 
+
 class CommentAdmin(admin.ModelAdmin):
     list_display = ('author', 'short_description', 'post_link', 'created_on')
     list_filter = ('active', 'created_on')
