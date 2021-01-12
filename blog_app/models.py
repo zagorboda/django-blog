@@ -12,6 +12,13 @@ STATUS = (
 )
 
 
+class Tag(models.Model):
+    tagline = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.tagline
+
+
 class Post(models.Model, HitCountMixin):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
@@ -20,9 +27,11 @@ class Post(models.Model, HitCountMixin):
     content = models.TextField()
     created_on = models.DateTimeField(auto_now_add=True)
     status = models.IntegerField(choices=STATUS, default=0)
+
     hit_count_generic = GenericRelation(HitCount, object_id_field='object_pk',
                                         related_query_name='hit_count_generic_relation')
     likes = models.ManyToManyField('auth.User', blank=True, related_name='post_likes')
+    tags = models.ManyToManyField(Tag, blank=True)
 
     def get_absolute_url(self):
         return reverse("blog_app:post_detail", kwargs={"slug": self.slug})
@@ -33,8 +42,8 @@ class Post(models.Model, HitCountMixin):
     def get_number_of_likes(self):
         return self.likes.count()
 
-    # def current_hit_count(self):
-    #     return self.hit_count.hits
+    def current_hit_count(self):
+        return self.hit_count.hits
 
     class Meta:
         ordering = ['-created_on']

@@ -2,22 +2,34 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 
-from .models import Post, Comment, ReportPost
+from .models import Post, Comment, ReportPost, Tag
 
 
 class PostAdmin(admin.ModelAdmin):
-    list_display = ('title', 'author', 'slug', 'status', 'created_on', 'formatted_hit_count')
+    list_display = ('title', 'author', 'slug', 'status', 'created_on', 'formatted_hit_count', 'formatted_likes')
     list_filter = ('status',)
-    readonly_fields = ('formatted_hit_count',)
-    search_fields = ('title', 'content', 'author__username')
+    readonly_fields = ('formatted_hit_count', 'formatted_likes')
+    search_fields = ('title', 'content', 'author__username', 'tags__tagline')
     prepopulated_fields = {'slug': ('title',)}
+    # fields = ('title', )
+    # fieldsets = None
+    exclude = ('likes',)
+
+    filter_horizontal = ('tags',)
+
+    def formatted_likes(self, obj):
+        return obj.get_number_of_likes()
+
+    formatted_likes.short_description = 'Likes'
 
     def formatted_hit_count(self, obj):
-        return obj.hit_count.hits if obj.hit_count.hits > 0 else 0
+        if obj.id:
+            hits = obj.current_hit_count()
+            return hits if hits > 0 else 0
+        return 0
 
     formatted_hit_count.admin_order_field = 'hit_count_generic__hit_count'
     formatted_hit_count.short_description = 'Hits'
-
 
 
 class CommentAdmin(admin.ModelAdmin):
@@ -50,7 +62,6 @@ class ReportAdmin(admin.ModelAdmin):
 
     total_reports.admin_order_field = 'total_reports'
 
-
     def post_link(self, obj):
         return mark_safe('<a href="{}">{}</a>'.format(
             reverse('admin:%s_%s_change' % (obj._meta.app_label, obj.post._meta.model_name), args=[obj.post.id]),
@@ -58,6 +69,12 @@ class ReportAdmin(admin.ModelAdmin):
     post_link.short_description = 'Admin post url'
 
 
+class TagAdmin(admin.ModelAdmin):
+    list_display = ('tagline',)
+    search_fields = ('tagline',)
+
+
 admin.site.register(Post, PostAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(ReportPost, ReportAdmin)
+admin.site.register(Tag, TagAdmin)
