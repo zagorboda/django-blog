@@ -1,44 +1,8 @@
-from django import forms
 from django.contrib import admin
-from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 
 from .models import Post, Comment, ReportPost, Tag
-
-
-class PostAdminForm(forms.ModelForm):
-    tags = forms.ModelMultipleChoiceField(
-        queryset=Tag.objects.all(),
-        required=False,
-        widget=FilteredSelectMultiple(
-          verbose_name='Tags',
-          is_stacked=False
-        )
-    )
-
-    class Meta:
-        fields = "__all__"
-        model = Post
-
-    def __init__(self, *args, **kwargs):
-        super(PostAdminForm, self).__init__(*args, **kwargs)
-
-        if self.instance and self.instance.pk:
-            self.fields['tags'].initial = self.instance.posts.all()
-
-    def save(self, commit=True):
-        post = super(PostAdminForm, self).save(commit=False)
-
-        if commit:
-            post.save()
-
-        if post.pk:
-            print(self.cleaned_data)
-            print(post.posts.set(self.cleaned_data['tags']))
-        self.save_m2m()
-
-        return post
 
 
 class PostAdmin(admin.ModelAdmin):
@@ -51,12 +15,7 @@ class PostAdmin(admin.ModelAdmin):
     # fieldsets = None
     exclude = ('likes',)
 
-    filter_horizontal = ('posts',)
-    form = PostAdminForm
-
-
-    # def get_all_tags(self, obj):
-    #     return obj.tag_set.all()
+    filter_horizontal = ('tags',)
 
     def formatted_likes(self, obj):
         return obj.get_number_of_likes()
@@ -113,8 +72,6 @@ class ReportAdmin(admin.ModelAdmin):
 class TagAdmin(admin.ModelAdmin):
     list_display = ('tagline',)
     search_fields = ('tagline',)
-    
-    filter_horizontal = ('posts',)
 
 
 admin.site.register(Post, PostAdmin)
