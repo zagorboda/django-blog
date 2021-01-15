@@ -155,11 +155,13 @@ class PostDetail(HitCountDetailView):
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         if self.object.status:
+            print(self.object.tags.all())
             context = self.get_context_data(object=self.object)
             if self.request.user in self.object.likes.all():
                 context['is_liked'] = True
             else:
                 context['is_liked'] = False
+            context['tags'] = self.object.tags.all()
             return self.render_to_response(context)
         else:
             raise Http404
