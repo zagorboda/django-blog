@@ -18,9 +18,6 @@ from .models import Post, ReportPost, Tag
 from datetime import datetime
 
 
-
-
-
 class BlogPostCounterMixin(object):
     def get_context_data(self, **kwargs):
         context = super(BlogPostCounterMixin, self).get_context_data(**kwargs)
@@ -206,14 +203,13 @@ def create_new_post(request):
             new_post.created_on = datetime.now()
             new_post.updated_on = datetime.now()
             new_post.status = 0
-            print(form.cleaned_data['tags'])
-            print(form.cleaned_data['tags'].split())
+
             new_post.save()
-            some_tag = Tag.objects.get(tagline=form.cleaned_data['tags'])
-            print('Some tag: ', some_tag)
-            print(new_post.tags.all())
-            new_post.tags.set(form.cleaned_data['tags'].split())
-            # new_post.tags.set(form.cleaned_data['tags'].split())
+            for tag in form.cleaned_data['tags'].split('#'):
+                if tag:
+                    new_post.tags.add(
+                        Tag.objects.get_or_create(tagline=tag.strip())[0]
+                    )
 
             new_post.save()
 

@@ -13,7 +13,7 @@ STATUS = (
 
 
 class Tag(models.Model):
-    tagline = models.CharField(max_length=200)
+    tagline = models.CharField(max_length=200, unique=True)
 
     def __str__(self):
         return self.tagline

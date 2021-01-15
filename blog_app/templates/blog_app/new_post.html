@@ -11,6 +11,8 @@
   <form action="" method="post">
     {% csrf_token %}
     {{ form.as_p }}
+    <p>Tags are determined by #</p>
+    <p>Examples: #sport #tech #regular life</p>
     <input type="submit" value="Submit">
   </form>
 
