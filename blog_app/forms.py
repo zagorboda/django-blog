@@ -6,7 +6,8 @@ class NewPostForm(forms.Form):
     title = forms.CharField(label='Title', max_length=200)
     # slug = forms.SlugField(label='Slug', max_length=200)
     content = forms.CharField(label='Text', widget=forms.Textarea)
-    # author = forms.TextInput()
+    tags = forms.CharField(label='Tags', widget=forms.Textarea)
+    # author = forms.TextInput()s
     # created_on = forms.DateField()
 
 

@@ -13,7 +13,7 @@ from hitcount.views import HitCountDetailView
 # from django.db.models import Q  # Search
 
 from .forms import NewPostForm, CommentForm
-from .models import Post, ReportPost
+from .models import Post, ReportPost, Tag
 
 from datetime import datetime
 
@@ -206,6 +206,14 @@ def create_new_post(request):
             new_post.created_on = datetime.now()
             new_post.updated_on = datetime.now()
             new_post.status = 0
+            print(form.cleaned_data['tags'])
+            print(form.cleaned_data['tags'].split())
+            new_post.save()
+            some_tag = Tag.objects.get(tagline=form.cleaned_data['tags'])
+            print('Some tag: ', some_tag)
+            print(new_post.tags.all())
+            new_post.tags.set(form.cleaned_data['tags'].split())
+            # new_post.tags.set(form.cleaned_data['tags'].split())
 
             new_post.save()
 
