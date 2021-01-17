@@ -50,6 +50,10 @@
                 <p><a href="{%url 'blog_app:edit_post' post.slug%}">Edit this post</a></p>
             {% endif %}
 
+            {% if post.image %}
+            <img src="{{ post.image.url }}" alt="{{ post.title }}">
+            {% endif %}
+
             <p>
                 {%for tag in tags%}
                 <span style="border:1px solid black;border-radius:10%;padding:0.3em;">

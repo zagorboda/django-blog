@@ -1,7 +1,8 @@
 from . import views
 from api.views import schema_view
 from django.urls import path, include
-
+from django.conf import settings
+from django.conf.urls.static import static
 
 app_name = 'blog_app'
 urlpatterns = [
@@ -18,3 +19,6 @@ urlpatterns = [
 
     path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

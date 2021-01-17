@@ -33,6 +33,8 @@ class Post(models.Model, HitCountMixin):
     likes = models.ManyToManyField('auth.User', blank=True, related_name='post_likes')
     tags = models.ManyToManyField(Tag, blank=True)
 
+    image = models.ImageField(upload_to='images/', blank=True)
+
     def get_absolute_url(self):
         return reverse("blog_app:post_detail", kwargs={"slug": self.slug})
 

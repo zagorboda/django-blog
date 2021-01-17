@@ -128,11 +128,14 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'
 }
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 STATIC_URL = '/static/'
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+# PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 # STATIC_ROOT = os.path.normpath(os.path.join(BASE_DIR, 'staticfiles'))
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles/')

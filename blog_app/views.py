@@ -207,9 +207,10 @@ class PostDetail(HitCountDetailView):
 def create_new_post(request):
     """ Create form to add new post """
     if request.method == 'POST':
-
-        form = NewPostForm(request.POST)
+        print('Files = ', request.FILES)
+        form = NewPostForm(request.POST, request.FILES)
         if form.is_valid():
+            print(form.cleaned_data)
             new_post = Post()
             new_post.title = form.cleaned_data['title']
             new_post.slug = slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, str(datetime.now())))
@@ -220,11 +221,14 @@ def create_new_post(request):
             new_post.status = 0
 
             new_post.save()
+
             for tag in form.cleaned_data['tags'].split('#'):
                 if tag:
                     new_post.tags.add(
                         Tag.objects.get_or_create(tagline=tag.strip())[0]
                     )
+
+            new_post.image = form.cleaned_data['image']
 
             new_post.save()
 
@@ -248,9 +252,11 @@ def edit_post(request, slug):
 
     if request.user.id == old_post.author.id:
         if request.method == 'POST':
-            form = NewPostForm(request.POST)
+            print('Files = ', request.FILES)
+            form = NewPostForm(request.POST, request.FILES)
 
             if form.is_valid():
+                print(form.cleaned_data)
                 old_tags = [str(tag) for tag in old_post.tags.all()]
                 new_tags = form.cleaned_data['tags'].strip('#').split(' #')
                 delete_tags = list(set(old_tags) - set(new_tags))
@@ -258,12 +264,16 @@ def edit_post(request, slug):
 
                 updated_post = Post.objects.get(slug=slug)
                 updated_post.title = form.cleaned_data['title']
-                updated_post.slug = slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, old_post.created_on)),
-                updated_post.content = form.cleaned_data['content'],
+                updated_post.slug = slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, old_post.created_on))
+                updated_post.content = form.cleaned_data['content']
                 updated_post.updated_on = datetime.now()
 
                 updated_post.tags.remove(*[Tag.objects.get(tagline=tag) for tag in delete_tags])
                 updated_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in add_tags])
+
+                updated_post.image = form.cleaned_data['image']
+
+                updated_post.save()
 
                 return HttpResponseRedirect(reverse('blog_app:home'))
 
@@ -271,7 +281,8 @@ def edit_post(request, slug):
             initial_dict = {
                 'title': old_post.title,
                 'content': old_post.content,
-                'tags': ' '.join(f'#{str(x)}' for x in old_post.tags.all())
+                'tags': ' '.join(f'#{str(x)}' for x in old_post.tags.all()),
+                'image': old_post.image
             }
 
             form = NewPostForm(initial=initial_dict)
