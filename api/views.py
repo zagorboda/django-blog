@@ -52,7 +52,6 @@ class CustomPagination(pagination.PageNumberPagination):
                'previous': self.get_previous_link()
             },
             'count': self.page.paginator.count,
-            'create_new_post_url': self.request.build_absolute_uri(reverse('new-post')),
             'page': int(self.request.GET.get('page', 1)),  # can not set default = self.page
             'page_size': int(self.request.GET.get('page_size', self.page_size)),
         }
@@ -61,6 +60,9 @@ class CustomPagination(pagination.PageNumberPagination):
             response_data['user_profile_url'] = self.request.build_absolute_uri(
                 reverse('user-detail', kwargs={'username': self.request.user})
             )
+            response_data['create_new_post_url'] = self.request.build_absolute_uri(
+                reverse('new-post')
+            ),
         else:
             response_data['login_url'] = self.request.build_absolute_uri(reverse('login'))
             response_data['sign_up_url'] = self.request.build_absolute_uri(reverse('signup'))
