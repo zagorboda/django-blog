@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required  # permission_required
+from django.contrib.postgres.search import SearchVector
 from django.core.paginator import Paginator
 from django.http import HttpResponseRedirect, Http404  # HttpResponse
 from django.shortcuts import render, get_object_or_404
@@ -10,7 +11,7 @@ from django.views.generic import RedirectView
 from hitcount.views import HitCountDetailView
 
 # from django.contrib.postgres.search import SearchVector  # Search
-# from django.db.models import Q  # Search
+from django.db.models import Q  # Search
 
 from .forms import NewPostForm, CommentForm
 from .models import Post, ReportPost, Tag
@@ -42,8 +43,16 @@ def search(request):
             page = request.GET.get('page', 1)
 
             query = request.GET.get('q')
-            posts = Post.objects.filter(title__icontains=query, status=1).order_by('-created_on')
-            paginator = Paginator(posts, 3)
+            posts = Post.objects.filter(
+                Q(title__icontains=query) | Q(tags__tagline__icontains=query), status=1
+            ).distinct().order_by('-created_on')
+            # posts = Post.objects.filter(
+            #     title__icontains=query, tags__tagline__icontains=query, status=1
+            # ).order_by('-created_on')
+            # posts = Post.objects.annotate(
+            #     search=SearchVector('title'),
+            # ).filter(search__icontains=query, status=1)
+            paginator = Paginator(posts, 10)
             posts = paginator.page(page)
 
             return render(request, 'blog_app/search.html',
