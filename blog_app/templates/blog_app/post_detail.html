@@ -46,6 +46,9 @@
         <div class="col-md-12">
             <h1>{% block title %} {{ post.title }} {% endblock title %}</h1>
             <p class="text-muted"><a href="{%url 'user_app:profile' post.author%}">{{ post.author }}</a> | {{ post.created_on }}</p>
+            {% if is_owner %}
+                <p><a href="{%url 'blog_app:edit_post' post.slug%}">Edit this post</a></p>
+            {% endif %}
 
             <p>
                 {%for tag in tags%}
@@ -56,7 +59,7 @@
             </p>
 
             <p class="text-muted"> Views: {% get_hit_count for post %} </p>
-            <p id="likes"> Likes: <span id="likes_count"> {{ object.likes.count }} </span></p>
+            <p id="likes"> Likes: <span id="likes_count"> {{ post.likes.count }} </span></p>
 
                 {% if is_liked %}
                     <button class="btn btn-primary" name="like" id="like2" onclick="make_ajax_request(this)">Remove like</button>

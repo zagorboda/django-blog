@@ -155,13 +155,17 @@ class PostDetail(HitCountDetailView):
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         if self.object.status:
-            print(self.object.tags.all())
             context = self.get_context_data(object=self.object)
             if self.request.user in self.object.likes.all():
                 context['is_liked'] = True
             else:
                 context['is_liked'] = False
             context['tags'] = self.object.tags.all()
+            if self.object.author.id == self.request.user.id:
+                context['is_owner'] = True
+            else:
+                context['is_owner'] = False
+            context_object_name = 'post'
             return self.render_to_response(context)
         else:
             raise Http404
@@ -233,24 +237,32 @@ def edit_post(request, slug):
     """ View to edit created post """
     old_post = get_object_or_404(Post, slug=slug)
 
-    if request.user == old_post.author:
+    if request.user.id == old_post.author.id:
         if request.method == 'POST':
             form = NewPostForm(request.POST)
 
             if form.is_valid():
-                Post.objects.filter(slug=slug).update(
-                    title=form.cleaned_data['title'],
-                    slug=slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, old_post.created_on)),
-                    content=form.cleaned_data['content'],
-                    updated_on=datetime.now()
-                )
+                old_tags = [str(tag) for tag in old_post.tags.all()]
+                new_tags = form.cleaned_data['tags'].strip('#').split(' #')
+                delete_tags = list(set(old_tags) - set(new_tags))
+                add_tags = list(set(new_tags) - set(old_tags))
+
+                updated_post = Post.objects.get(slug=slug)
+                updated_post.title = form.cleaned_data['title']
+                updated_post.slug = slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, old_post.created_on)),
+                updated_post.content = form.cleaned_data['content'],
+                updated_post.updated_on = datetime.now()
+
+                updated_post.tags.remove(*[Tag.objects.get(tagline=tag) for tag in delete_tags])
+                updated_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in add_tags])
 
                 return HttpResponseRedirect(reverse('blog_app:home'))
 
         else:
             initial_dict = {
                 'title': old_post.title,
-                'content': old_post.content
+                'content': old_post.content,
+                'tags': ' '.join(f'#{str(x)}' for x in old_post.tags.all())
             }
 
             form = NewPostForm(initial=initial_dict)
