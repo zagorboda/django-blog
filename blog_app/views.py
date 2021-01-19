@@ -210,27 +210,27 @@ def create_new_post(request):
         print('Files = ', request.FILES)
         form = NewPostForm(request.POST, request.FILES)
         if form.is_valid():
-            print(form.cleaned_data)
             new_post = Post()
+
             new_post.title = form.cleaned_data['title']
             new_post.slug = slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, str(datetime.now())))
             new_post.content = form.cleaned_data['content']
             new_post.author = request.user
             new_post.created_on = datetime.now()
-            new_post.updated_on = datetime.now()
+            # new_post.updated_on = datetime.now()
             new_post.status = 0
 
+            new_post.image = form.cleaned_data['image']
+
             new_post.save()
+
+            # image_resize(), call method directly to not to use signals
 
             for tag in form.cleaned_data['tags'].split('#'):
                 if tag:
                     new_post.tags.add(
                         Tag.objects.get_or_create(tagline=tag.strip())[0]
                     )
-
-            new_post.image = form.cleaned_data['image']
-
-            new_post.save()
 
             return HttpResponseRedirect(reverse('blog_app:home'))
 
@@ -256,22 +256,26 @@ def edit_post(request, slug):
             form = NewPostForm(request.POST, request.FILES)
 
             if form.is_valid():
-                print(form.cleaned_data)
-                old_tags = [str(tag) for tag in old_post.tags.all()]
-                new_tags = form.cleaned_data['tags'].strip('#').split(' #')
-                delete_tags = list(set(old_tags) - set(new_tags))
-                add_tags = list(set(new_tags) - set(old_tags))
-
+                # set new data
                 updated_post = Post.objects.get(slug=slug)
                 updated_post.title = form.cleaned_data['title']
                 updated_post.slug = slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, old_post.created_on))
                 updated_post.content = form.cleaned_data['content']
                 updated_post.updated_on = datetime.now()
 
+                # check what tags to add and delete
+                old_tags = [str(tag) for tag in old_post.tags.all()]
+                new_tags = list(filter(None, form.cleaned_data['tags'].strip('#').split(' #')))
+                delete_tags = list(set(old_tags) - set(new_tags))
+                add_tags = list(set(new_tags) - set(old_tags))
+
                 updated_post.tags.remove(*[Tag.objects.get(tagline=tag) for tag in delete_tags])
                 updated_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in add_tags])
 
-                updated_post.image = form.cleaned_data['image']
+                if request.FILES:
+                    updated_post.image = form.cleaned_data['image']
+                elif form.cleaned_data['image'] is False:
+                    updated_post.image = None
 
                 updated_post.save()
 

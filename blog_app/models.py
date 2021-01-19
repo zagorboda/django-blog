@@ -5,7 +5,6 @@ from hitcount.models import HitCountMixin, HitCount
 from django.contrib.contenttypes.fields import GenericRelation
 # from django.utils.encoding import python_2_unicode_compatible
 
-
 STATUS = (
     (0, "Draft"),
     (1, "Publish")
