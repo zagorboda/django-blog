@@ -23,7 +23,10 @@ def resize_image(image_path):
 
 def check_image_size(image):
     """ Return True if image size less than 5mb """
-    return image.file.size < 5242880
+    if image.size > 1024 : #5242880
+        raise ValidationError('Maximum file size is 5mb. Selected image size is {:.2f} mb'.format(
+            image.size / 1024**2
+        ))
 
 
 @receiver(pre_save, sender=Post)
@@ -32,15 +35,9 @@ def pre_process_image(sender, instance, **kwargs):
         current = instance
         previous = Post.objects.get(id=instance.id)
         if current.image != previous.image:  # if image was changed
-            if current.image:  # if new image added
-                if not check_image_size(current.image):
-                    raise ValidationError('Maximum file size is 5mb')
 
             if previous.image:
                 delete_image(previous.image.path)
-    elif instance.image:
-        if not check_image_size(instance.image):
-            raise ValidationError('Maximum file size is 5mb')
 
 
 @receiver(post_save, sender=Post)

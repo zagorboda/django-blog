@@ -252,7 +252,6 @@ def edit_post(request, slug):
 
     if request.user.id == old_post.author.id:
         if request.method == 'POST':
-            print('Files = ', request.FILES)
             form = NewPostForm(request.POST, request.FILES)
 
             if form.is_valid():
@@ -280,6 +279,8 @@ def edit_post(request, slug):
                 updated_post.save()
 
                 return HttpResponseRedirect(reverse('blog_app:home'))
+            else:
+                print('form is not valid')
 
         else:
             initial_dict = {
