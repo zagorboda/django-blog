@@ -23,7 +23,7 @@ def resize_image(image_path):
 
 def check_image_size(image):
     """ Return True if image size less than 5mb """
-    if image.size > 1024 : #5242880
+    if image.size > 5242880:
         raise ValidationError('Maximum file size is 5mb. Selected image size is {:.2f} mb'.format(
             image.size / 1024**2
         ))

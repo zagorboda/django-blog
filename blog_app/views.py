@@ -213,7 +213,11 @@ def create_new_post(request):
             new_post = Post()
 
             new_post.title = form.cleaned_data['title']
-            new_post.slug = slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, str(datetime.now())))
+            new_post.slug = slugify('{}-{}-{}'.format(
+                form.cleaned_data['title'],
+                request.user.username,
+                datetime.now().strftime('%Y-%m-%d'))
+            )
             new_post.content = form.cleaned_data['content']
             new_post.author = request.user
             new_post.created_on = datetime.now()
@@ -258,7 +262,10 @@ def edit_post(request, slug):
                 # set new data
                 updated_post = Post.objects.get(slug=slug)
                 updated_post.title = form.cleaned_data['title']
-                updated_post.slug = slugify('{}-{}-{}'.format(form.cleaned_data['title'], request.user.username, old_post.created_on))
+                updated_post.slug = slugify('{}-{}-{}'.format(
+                    form.cleaned_data['title'],
+                    request.user.username,
+                    old_post.created_on.strftime('%Y-%m-%d')))
                 updated_post.content = form.cleaned_data['content']
                 updated_post.updated_on = datetime.now()
 
