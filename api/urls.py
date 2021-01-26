@@ -19,4 +19,6 @@ urlpatterns = [
     path('login/', views.UserLoginApiView.as_view(), name='login'),
     path('signup/', views.UserCreateApiView.as_view(), name='signup'),
     path('', views.api_root),
+
+    path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
 ]

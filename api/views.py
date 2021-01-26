@@ -19,6 +19,10 @@ from .serializers import UserSerializer, PostListSerializer, PostDetailSerialize
 
 from datetime import datetime
 
+from hitcount.views import HitCountDetailView
+from hitcount.models import HitCount
+from hitcount.views import HitCountMixin
+
 # from .permissions import IsOwnerOrReadOnly
 # from django.contrib.auth import logout
 # from .filters import DynamicSearchFilter
@@ -84,6 +88,9 @@ class PostDetail(GenericAPIView):
 
         queryset = self.get_object(slug)
         serializer = PostDetailSerializer(queryset, context={'request': request})
+
+        hit_count = HitCount.objects.get_for_object(queryset)
+        hit_count_response = HitCountMixin.hit_count(request, hit_count)
 
         return Response(serializer.data)
 
