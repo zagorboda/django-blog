@@ -1,10 +1,13 @@
 from django.contrib.auth.models import User
+from django.conf.urls import url
 from django.http import Http404
+from django.shortcuts import redirect, get_object_or_404
 from django.utils.text import slugify
-from rest_framework import generics, status, permissions, pagination, filters
+
+from rest_framework import generics, status, permissions, pagination, filters, renderers, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, action
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -13,23 +16,15 @@ from rest_framework.views import APIView
 
 from blog_app.models import Post, Comment
 from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterSerializer
-from .filters import DynamicSearchFilter
 
 from datetime import datetime
-from .serializers import UserSerializer, PostDetailSerializer, PostListSerializer
-from rest_framework.response import Response
-from rest_framework import renderers, viewsets, generics, status, permissions
-from rest_framework.decorators import action, api_view
+
 # from .permissions import IsOwnerOrReadOnly
 # from django.contrib.auth import logout
-from django.shortcuts import redirect, get_object_or_404
-
-from blog_app.models import Post
-# from user_app.models import CustomUser
-from django.contrib.auth.models import User
-
+# from .filters import DynamicSearchFilter
 
 from rest_framework_swagger.views import get_swagger_view
+
 schema_view = get_swagger_view(title='Blog API')
 
 
@@ -111,7 +106,9 @@ class PostDetail(GenericAPIView):
             return CommentSerializer
         return PostDetailSerializer
 
+
 class PostLikeAPIToggle(APIView):
+    """ View to like/unlike post """
     # authentication_classes = (authentication.SessionAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
 

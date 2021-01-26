@@ -5,7 +5,6 @@
 {% block content %}
 
 <script>
-
     function make_ajax_request(elem){
             // create an AJAX call
             $.ajax({
@@ -47,7 +46,24 @@
         <div class="col-md-12">
             <h1>{% block title %} {{ post.title }} {% endblock title %}</h1>
             <p class="text-muted"><a href="{%url 'user_app:profile' post.author%}">{{ post.author }}</a> | {{ post.created_on }}</p>
-            <p class="text-muted"> Views: {% get_hit_count for post %} </p> <p id="likes"> Likes: <span id="likes_count"> {{ object.likes.count }} </span></p>
+            {% if is_owner %}
+                <p><a href="{%url 'blog_app:edit_post' post.slug%}">Edit this post</a></p>
+            {% endif %}
+
+            {% if post.image %}
+            <img src="{{ post.image.url }}" alt="{{ post.title }}">
+            {% endif %}
+
+            <p>
+                {%for tag in tags%}
+                <span style="border:1px solid black;border-radius:10%;padding:0.3em;">
+                    {{tag}}&#8203;
+                </span>
+                {%endfor%}
+            </p>
+
+            <p class="text-muted"> Views: {% get_hit_count for post %} </p>
+            <p id="likes"> Likes: <span id="likes_count"> {{ post.likes.count }} </span></p>
 
             {% if user.is_authenticated %}
 
@@ -94,7 +110,7 @@
         <div class="container">
             <h3>Leave a comment</h3>
                 <form method="post" style="margin-top: 1.3em;" class="mb-3">
-                    <input type="text" name="body">
+                    <textarea name="body"></textarea>
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary  btn-lg">Submit</button>
                 </form>

@@ -1,3 +1,6 @@
+staticfiles/
+media/
+
 blog/.env
 
 *.pyc
