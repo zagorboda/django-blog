@@ -30,6 +30,23 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ('author', 'author_username', 'body', 'created_on', 'active')
 
 
+class TagSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Tag
+        fields = ('tagline',)
+        extra_kwargs = {
+            'tagline': {'validators': []},
+        }
+
+    def create(self, validated_data):
+        pass # get_or_create
+
+    # def get_unique_validators(self):
+    #     """Overriding method to disable unique checks"""
+    #     return []
+
+
 class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     """ Serialize post, return list of comments """
     url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
@@ -45,12 +62,17 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     total_likes = serializers.SerializerMethodField('get_likes')
     like_url = serializers.SerializerMethodField('get_like_url')
 
-    tags = serializers.SerializerMethodField('get_tags')
+    # tags = serializers.SerializerMethodField('get_tags')
+    tags = TagSerializer(many=True, read_only=False, required=False)
+    image_url = serializers.SerializerMethodField('get_image_url')
 
     class Meta:
         model = Post
         fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
-                  'created_on', 'comments', 'total_views', 'total_likes', 'like_url', 'tags')
+                  'created_on', 'comments', 'total_views', 'total_likes', 'like_url', 'image_url', 'tags')
+        extra_kwargs = {
+            'tags': {'validators': []},
+        }
 
     def get_active_comments(self, obj):
         """ Return only active comments (active=True) """
@@ -83,7 +105,44 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     def get_image_url(self, obj):
         """ Return url to image """
-        pass
+        if obj.image != '':
+            request = self.context.get("request")
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+    # def update(self, instance, validated_data):
+    #     print(validated_data)
+    #     # tags = validated_data.pop('tags', None)
+    #     Post.objects.filter(pk=instance.id).update(**validated_data)
+    #     post = Post.objects.get(pk=instance.id)
+    #     return post
+    #     # print(validated_data)
+    #     # print(obj)
+    #
+    #     # obj.update(**validated_data)
+    #
+    #     # return obj
+    #
+    #     # post = Post.objects.get(data)
+    #     # for track_data in tracks_data:
+    #     #     Track.objects.create(album=album, **track_data)
+
+    # def create(self, validated_data):
+    #     tags = validated_data.pop('tags')
+    #     post = Post.objects.create(**validated_data)
+    #     return post
+    #
+    # def validate(self, data):
+    #     # for tag in data['tags']:
+    #     #     print(tag)
+    #     return data
+
+    # def get_attr_or_default(self, attr, attrs, default=''):
+    #     """Return the value of key ``attr`` in the dict ``attrs``; if that is
+    #     not present, return the value of the attribute ``attr`` in
+    #     ``self.instance``; otherwise return ``default``.
+    #     """
+    #     return attrs.get(attr, getattr(self.instance, attr, ''))
 
     # def get_field_names(self, *args, **kwargs):
     #     field_names = self.context.get('fields', None)

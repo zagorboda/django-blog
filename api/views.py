@@ -2,19 +2,21 @@ from django.contrib.auth.models import User
 from django.conf.urls import url
 from django.http import Http404
 from django.shortcuts import redirect, get_object_or_404
+from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 
 from rest_framework import generics, status, permissions, pagination, filters, renderers, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view, action
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
-from blog_app.models import Post, Comment
+from blog_app.models import Post, Comment, Tag
 from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterSerializer
 
 from datetime import datetime
@@ -61,7 +63,7 @@ class CustomPagination(pagination.PageNumberPagination):
             )
             response_data['create_new_post_url'] = self.request.build_absolute_uri(
                 reverse('new-post')
-            ),
+            )
         else:
             response_data['login_url'] = self.request.build_absolute_uri(reverse('login'))
             response_data['sign_up_url'] = self.request.build_absolute_uri(reverse('signup'))
@@ -193,23 +195,34 @@ class EditPost(APIView):
         """ Edit post field """
         post = self.get_object(slug)
         if self.request.user.is_authenticated and self.request.user.id == post.author.id:
-            print(request.data)
             if 'title' in request.data:
-                request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on))
+                request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on.strftime('%Y-%m-%d')))
             else:
                 request.data['slug'] = post.slug
                 request.data['title'] = post.title
+            if 'content' not in request.data:
+                request.data['content'] = post.content
             request.data['updated_on'] = datetime.now()
             request.data['status'] = 0
-            serializer = PostDetailSerializer(post, data=request.data, context={'request': request})
 
+            request_tags = request.data['tags']
+            del request.data['tags']
+
+            serializer = PostDetailSerializer(post, data=request.data, context={'request': request})
             if serializer.is_valid():
-                print('ser is valid -----------------------------')
                 serializer.save()
+                updated_post = self.get_object(slug)
+
+                old_tags = [str(tag) for tag in post.tags.all()]
+                new_tags = list(filter(None, request_tags))
+                delete_tags = list(set(old_tags) - set(new_tags))
+                add_tags = list(set(new_tags) - set(old_tags))
+
+                updated_post.tags.remove(*[Tag.objects.get(tagline=tag) for tag in delete_tags])
+                updated_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in add_tags])
+
                 return Response(serializer.data)
-            print('ser error ---------------------------')
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        print('401 ---------------------------')
         return Response({'detail': "You don't have permission to edit this post"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -224,14 +237,27 @@ class CreateNewPost(APIView):
     def post(self, request):
         """ Create new object """
         if request.user.is_authenticated:
-            # Check if fields not empty on client side ?
-            try:
-                _ = request.data['title']
-                _ = request.data['content']
-            except KeyError:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+            required_fields = ('title', 'content')
+            validation_errors = dict()
 
-            request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'],request.user.username,datetime.now()))
+            for field in required_fields:
+                if field not in request.data:
+                    validation_errors[field] = ['This field may not be blank.']
+            if validation_errors:
+                raise ValidationError(validation_errors)
+
+            slug = slugify('{}-{}-{}'.format(request.data['title'],request.user.username,datetime.now().strftime('%Y-%m-%d')))
+            while Post.objects.filter(slug=slug).exists():
+                slug = '{}-{}'.format(slug, get_random_string(length=2))
+            request.data['slug'] = slug
+            print(request.data)
+            tags_in_request = False
+            if 'tags' in request.data:
+                print('here tags')
+                request_tags = request.data['tags']
+                del request.data['tags']
+                tags_in_request = True
+            print(request.data)
             serializer = PostDetailSerializer(data=request.data, context={'request': request})
             if serializer.is_valid():
                 serializer.save(
@@ -240,6 +266,12 @@ class CreateNewPost(APIView):
                     status=0,
                     author=self.request.user
                 )
+
+                created_post = get_object_or_404(Post, slug=slug)
+
+                if tags_in_request:
+                    created_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in request_tags])
+
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_401_UNAUTHORIZED)
