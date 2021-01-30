@@ -64,12 +64,12 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     # tags = serializers.SerializerMethodField('get_tags')
     tags = TagSerializer(many=True, read_only=False, required=False)
-    image_url = serializers.SerializerMethodField('get_image_url')
+    # image_url = serializers.SerializerMethodField('get_image_url')
 
     class Meta:
         model = Post
         fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
-                  'created_on', 'comments', 'total_views', 'total_likes', 'like_url', 'image_url', 'tags')
+                  'created_on', 'comments', 'total_views', 'total_likes', 'like_url', 'image', 'tags')
         extra_kwargs = {
             'tags': {'validators': []},
         }
