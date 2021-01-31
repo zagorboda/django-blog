@@ -1,10 +1,11 @@
 # from django.core.paginator import Paginator
 from rest_framework import serializers, pagination
 from django.contrib.auth.models import User
-from rest_framework.validators import UniqueValidator
+# from rest_framework.validators import UniqueValidator
 from django.contrib.auth.password_validation import validate_password
+from rest_framework import serializers
 
-from blog_app.models import Post, Comment
+from blog_app.models import Post, Comment, Tag
 from rest_framework.reverse import reverse
 
 
@@ -29,6 +30,23 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ('author', 'author_username', 'body', 'created_on', 'active')
 
 
+class TagSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Tag
+        fields = ('tagline',)
+        extra_kwargs = {
+            'tagline': {'validators': []},
+        }
+
+    def create(self, validated_data):
+        pass # get_or_create
+
+    # def get_unique_validators(self):
+    #     """Overriding method to disable unique checks"""
+    #     return []
+
+
 class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     """ Serialize post, return list of comments """
     url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
@@ -40,9 +58,22 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     # edit_url = serializers.HyperlinkedRelatedField(view_name='edit-post', read_only=True, lookup_field='slug')
     edit_url = serializers.SerializerMethodField('get_edit_url')
 
+    total_views = serializers.SerializerMethodField('get_hits_count')
+    total_likes = serializers.SerializerMethodField('get_likes')
+    like_url = serializers.SerializerMethodField('get_like_url')
+
+    # tags = serializers.SerializerMethodField('get_tags')
+    tags = TagSerializer(many=True, read_only=False, required=False)
+    image = serializers.ImageField(max_length=None, allow_empty_file=True, allow_null=True, required=False)
+    # image_url = serializers.SerializerMethodField('get_image_url')
+
     class Meta:
         model = Post
-        fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on', 'comments')
+        fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
+                  'created_on', 'comments', 'total_views', 'total_likes', 'like_url', 'image', 'tags')
+        extra_kwargs = {
+            'tags': {'validators': []},
+        }
 
     def get_active_comments(self, obj):
         """ Return only active comments (active=True) """
@@ -53,7 +84,66 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     def get_edit_url(self, obj):
         """ Return url to edit-post view """
         request = self.context['request']
-        return reverse('edit-post', kwargs={'slug': obj.slug}, request=request)
+        if request and request.user.id == obj.author.id:
+            return reverse('edit-post', kwargs={'slug': obj.slug}, request=request)
+        return None
+
+    def get_hits_count(self, obj):
+        return obj.hit_count.hits
+
+    def get_likes(self, obj):
+        return obj.get_number_of_likes()
+
+    def get_like_url(self, obj):
+        request = self.context['request']
+        return reverse('post-like', kwargs={'slug': obj.slug}, request=request)
+
+    def get_tags(self, obj):
+        """ Return tags """
+        tags = Tag.objects.all().filter(post=obj)
+        tag_list = [tag.tagline for tag in tags]
+        return tag_list
+
+    def get_image_url(self, obj):
+        """ Return url to image """
+        if obj.image != '':
+            request = self.context.get("request")
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+    # def update(self, instance, validated_data):
+    #     print(validated_data)
+    #     # tags = validated_data.pop('tags', None)
+    #     Post.objects.filter(pk=instance.id).update(**validated_data)
+    #     post = Post.objects.get(pk=instance.id)
+    #     return post
+    #     # print(validated_data)
+    #     # print(obj)
+    #
+    #     # obj.update(**validated_data)
+    #
+    #     # return obj
+    #
+    #     # post = Post.objects.get(data)
+    #     # for track_data in tracks_data:
+    #     #     Track.objects.create(album=album, **track_data)
+
+    # def create(self, validated_data):
+    #     tags = validated_data.pop('tags')
+    #     post = Post.objects.create(**validated_data)
+    #     return post
+    #
+    # def validate(self, data):
+    #     # for tag in data['tags']:
+    #     #     print(tag)
+    #     return data
+
+    # def get_attr_or_default(self, attr, attrs, default=''):
+    #     """Return the value of key ``attr`` in the dict ``attrs``; if that is
+    #     not present, return the value of the attribute ``attr`` in
+    #     ``self.instance``; otherwise return ``default``.
+    #     """
+    #     return attrs.get(attr, getattr(self.instance, attr, ''))
 
     # def get_field_names(self, *args, **kwargs):
     #     field_names = self.context.get('fields', None)
@@ -69,14 +159,26 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
 
+    total_views = serializers.SerializerMethodField('get_hits_count')
     content = serializers.SerializerMethodField('get_short_content')
 
     class Meta:
         model = Post
-        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on')
+        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on',
+                  'total_views')
 
     def get_short_content(self, obj):
         return obj.content[:200]
+
+    def get_hits_count(self, obj):
+        return obj.hit_count.hits
+
+    def get_likes(self, obj):
+        return obj.get_number_of_likes()
+
+    def get_like_url(self, obj):
+        request = self.context['request']
+        return reverse('post-like', kwargs={'slug': obj.slug}, request=request)
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

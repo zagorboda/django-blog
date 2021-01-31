@@ -26,6 +26,11 @@ INSTALLED_APPS = [
     'django_extensions',
     'rest_framework.authtoken',
     'whitenoise.runserver_nostatic',
+<<<<<<< HEAD
+=======
+    'hitcount',
+    'rest_framework_swagger',
+>>>>>>> blog
 
     'django.contrib.admin',
     'django.contrib.auth',
@@ -73,6 +78,12 @@ DATABASES = {
         'PASSWORD': env("DATABASE_PASSWORD"),
         'HOST': env("DATABASE_HOST"),
         'PORT': env("DATABASE_PORT"),
+<<<<<<< HEAD
+=======
+        'TEST': {
+            'NAME': env("TEST_DATABASE_NAME"),
+        },
+>>>>>>> blog
     }
 }
 
@@ -119,14 +130,28 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+<<<<<<< HEAD
     'PAGE_SIZE': 10
 }
 
+=======
+    'PAGE_SIZE': 10,
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'
+}
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+>>>>>>> blog
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 STATIC_URL = '/static/'
 
+<<<<<<< HEAD
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+=======
+# PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+>>>>>>> blog
 
 # STATIC_ROOT = os.path.normpath(os.path.join(BASE_DIR, 'staticfiles'))
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles/')

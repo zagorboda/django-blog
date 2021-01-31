@@ -1,31 +1,97 @@
 {% extends 'layouts/base.html' %}
 
+{% load hitcount_tags %}
+
 {% block content %}
+
+<script>
+    function make_ajax_request(elem){
+            // create an AJAX call
+            $.ajax({
+                data: $(this).serialize(), // get the form data
+                url: "{% url 'blog_app:post_like' post.slug %}",
+                // on success
+                success: function (response) {
+                    var id = elem.id;
+                    var like_text = document.getElementById(id).textContent;
+
+                    var like_int = +document.getElementById("likes_count").textContent;
+
+                    if (like_text == "Like"){
+                        like_int++;
+                        document.getElementById(id).innerHTML = "Remove like";
+                    }
+                    if (like_text == "Remove like"){
+                        like_int--;
+                        document.getElementById(id).innerHTML = "Like";
+                    }
+
+                    document.getElementById("likes_count").innerHTML = like_int;
+                },
+                // on error
+                error: function (response) {
+                    // alert the error if any error occurred
+                    alert("Some error");
+                    console.log(response.responseJSON.errors)
+                }
+            });
+
+            return false;
+        };
+
+</script>
 
 {% if request.status != 404 %}
     <div class="container">
         <div class="col-md-12">
             <h1>{% block title %} {{ post.title }} {% endblock title %}</h1>
             <p class="text-muted"><a href="{%url 'user_app:profile' post.author%}">{{ post.author }}</a> | {{ post.created_on }}</p>
+            {% if is_owner %}
+                <p><a href="{%url 'blog_app:edit_post' post.slug%}">Edit this post</a></p>
+            {% endif %}
+
+            {% if post.image %}
+            <img src="{{ post.image.url }}" alt="{{ post.title }}">
+            {% endif %}
+
+            <p>
+                {%for tag in tags%}
+                <span style="border:1px solid black;border-radius:10%;padding:0.3em;">
+                    {{tag}}&#8203;
+                </span>
+                {%endfor%}
+            </p>
+
+            <p class="text-muted"> Views: {% get_hit_count for post %} </p>
+            <p id="likes"> Likes: <span id="likes_count"> {{ post.likes.count }} </span></p>
+
+                {% if is_liked %}
+                    <button class="btn btn-primary" name="like" id="like2" onclick="make_ajax_request(this)">Remove like</button>
+                {% else %}
+                    <button class="btn btn-primary" name="like" id="like1" onclick="make_ajax_request(this)">Like</button>
+                {% endif %}
+
             <p align="justify">{{ post.content | linebreaks }}</p>
         </div>
     </div>
 
     <hr>
 
-    {% if comments %}
+    {% if post.comments.all %}
     <div class="container">
         <div class="col-md-12">
-            {% for comment in comments %}
-                <div class="comments" style="padding: 10px;">
-                    <p class="font-weight-bold">
-                        <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
-                        <span class=" text-muted font-weight-normal">
-                            {{ comment.created_on }}
-                        </span>
-                    </p>
-                    {{ comment.body | linebreaks }}
-                </div>
+            {% for comment in post.comments.all %}
+                {% if comment.active %}
+                    <div class="comments" style="padding: 10px;">
+                        <p class="font-weight-bold">
+                            <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
+                            <span class=" text-muted font-weight-normal">
+                                {{ comment.created_on }}
+                            </span>
+                        </p>
+                        {{ comment.body | linebreaks }}
+                    </div>
+                {% endif %}
             {% endfor %}
         </div>
     </div>
@@ -35,12 +101,12 @@
 <!--        <p>{{request.session.message}}</p>-->
 <!--    {% endif %}-->
 
-    {% if comment_form %}
+    {% if user.is_authenticated %}
 
         <div class="container">
             <h3>Leave a comment</h3>
                 <form method="post" style="margin-top: 1.3em;" class="mb-3">
-                    {{ comment_form.as_p }}
+                    <textarea name="body"></textarea>
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary  btn-lg">Submit</button>
                 </form>
