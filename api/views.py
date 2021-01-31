@@ -224,13 +224,13 @@ class EditPost(APIView):
                 request_tags = data.getlist('tags')
                 del data['tags']
                 tags_in_request = True
-
             if 'image_changed' in data:
-                if 'image' in data:
-                    if data['image'] == 'deleted':
-                        data['image'] = None
+                # if 'image' in data:
+                if data['image'] == 'deleted':
+                    data['image'] = None
             else:
-                data.image = post.image
+                if post.image:
+                    data['image'] = post.image
 
             serializer = PostDetailSerializer(post, data=data, context={'request': request})
             if serializer.is_valid():
@@ -301,19 +301,22 @@ class CreateNewPost(APIView):
         if request.content_type.startswith('multipart/form-data'):
             # as user can upload image, content-type must be multipart/form-data
             # tags must be array of strings
-
             required_fields = ('title', 'content')
             validation_errors = dict()
-            data = request.data.copy()
+
+            if request.data:
+                data = request.data.copy()
+            else:
+                data = json.loads(request.body)
 
             for field in required_fields:
-                if field not in request.data:
+                if field not in data:
                     validation_errors[field] = ['This field may not be blank.']
             if validation_errors:
                 raise ValidationError(validation_errors)
 
             slug = slugify('{}-{}-{}'.format(
-                request.data['title'],
+                data['title'],
                 request.user.username,
                 datetime.now().strftime('%Y-%m-%d'))
             )

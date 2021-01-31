@@ -84,7 +84,7 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     def get_edit_url(self, obj):
         """ Return url to edit-post view """
         request = self.context['request']
-        if request.user.id == obj.author.id:
+        if request and request.user.id == obj.author.id:
             return reverse('edit-post', kwargs={'slug': obj.slug}, request=request)
         return None
 

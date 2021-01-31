@@ -8,6 +8,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework.request import Request
 import json
 
+# from rest_framework.test import APIClient
+
 from .serializers import PostListSerializer, PostDetailSerializer, CommentSerializer, UserSerializer
 from blog_app.models import Post, Comment
 from .views import UserDetail
@@ -151,20 +153,25 @@ class PostDetailTest(TestCase):
     """ Test module for post detail page"""
 
     def setUp(self):
-        user1 = User.objects.create_user(username='test_user')
-        user1.set_password('test_password')
-        user1.save()
+        self.user1 = User.objects.create_user(username='test_user')
+        self.password1 = 'test_password'
+        self.user1.set_password(self.password1)
+        self.user1.save()
 
         self.test_user = User.objects.create(
             username='some_user'
         )
-        self.password = 'test_password'
-        self.test_user.set_password(self.password)
+        self.test_password = 'test_password'
+        self.test_user.set_password(self.test_password)
+        self.test_user.save()
+
+        self.token1 = Token.objects.create(user=self.user1)
+        # self.test_token = Token.objects.create(user=self.test_user)
 
         self.post1 = Post.objects.create(
             title="Title",
             content="Content",
-            author=user1,
+            author=self.user1,
             slug='slug',
             status=1
         )
@@ -194,17 +201,29 @@ class PostDetailTest(TestCase):
         )
 
     def test_get_post_detail(self):
-        """ Get detail for existing active post """
+        """ Get detail for existing active post by unauthorized user (different edit_url) """
         client = Client()
-        response = client.get(reverse('post-detail', kwargs={'slug': 'slug'}))
+        response = client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+            # HTTP_AUTHORIZATION='Token {}'.format(self.token1)
+        )
 
-        response.data['url'] = response.data['url'][17:]
-        response.data['edit_url'] = response.data['edit_url'][17:]
-        response.data['author'] = response.data['author'][17:]
-        response.data['like_url'] = response.data['like_url'][17:]
+        factory = RequestFactory()
+        # factory.login(username=self.user1, password=self.password1)
+        # factory.credentials(HTTP_AUTHORIZATION='Token {}'.format(self.token1))
+
+        request = factory.get(
+            reverse('post-detail', kwargs={'slug': 'slug'})
+        )
+        test_request = Request(request)
+
+        # response.data['url'] = response.data['url'][17:]
+        # response.data['edit_url'] = response.data['edit_url'][17:]
+        # response.data['author'] = response.data['author'][17:]
+        # response.data['like_url'] = response.data['like_url'][17:]
 
         post = Post.objects.get(slug='slug')
-        serializer = PostDetailSerializer(post, context={'request': None})
+        serializer = PostDetailSerializer(post, context={'request': test_request})  # response.wsgi_request
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -234,7 +253,7 @@ class PostDetailTest(TestCase):
         """ Make POST request (create new comment) to post detail page by authorized user"""
         client = Client()
 
-        client.login(username=self.test_user.username, password=self.password)
+        client.login(username=self.test_user.username, password=self.test_password)
         token = Token.objects.create(user=self.test_user)
 
         response = client.post(
@@ -247,7 +266,7 @@ class PostDetailTest(TestCase):
         response.data['author'] = response.data['author'][17:]
 
         comment = Comment.objects.get(post=self.post1)
-        serializer = CommentSerializer(comment, context={'request': None})
+        serializer = CommentSerializer(comment, context={'request': None})  # request None?
 
         number_of_comments = Comment.objects.all().count()
 
@@ -259,7 +278,7 @@ class PostDetailTest(TestCase):
         """ Make POST request by authorized user with invalid data (empty body)"""
         client = Client()
 
-        client.login(username=self.test_user.username, password=self.password)
+        client.login(username=self.test_user.username, password=self.test_password)
         token = Token.objects.create(user=self.test_user)
 
         response = client.post(
@@ -283,14 +302,21 @@ class PostDetailTest(TestCase):
         client = Client()
         response = client.get(reverse('post-detail', kwargs={'slug': 'single-comment-slug'}))
 
-        response.data['url'] = response.data['url'][17:]
-        response.data['edit_url'] = response.data['edit_url'][17:]
-        response.data['author'] = response.data['author'][17:]
-        response.data['comments'][0]['author'] = response.data['comments'][0]['author'][17:]
-        response.data['like_url'] = response.data['like_url'][17:]
+        # response.data['url'] = response.data['url'][17:]
+        # response.data['edit_url'] = response.data['edit_url'][17:]
+        # response.data['author'] = response.data['author'][17:]
+        # response.data['comments'][0]['author'] = response.data['comments'][0]['author'][17:]
+        # response.data['like_url'] = response.data['like_url'][17:]
+
+        factory = RequestFactory()
+
+        request = factory.get(
+            reverse('post-detail', kwargs={'slug': 'single-comment-slug'})
+        )
+        test_request = Request(request)
 
         post = Post.objects.get(slug='single-comment-slug')
-        serializer = PostDetailSerializer(post, context={'request': None})
+        serializer = PostDetailSerializer(post, context={'request': test_request})
 
         number_of_comments = Comment.objects.all().filter(post=post).count()
 
@@ -313,7 +339,7 @@ class PostDetailTest(TestCase):
         response = client.get(reverse('post-detail', kwargs={'slug': 'several-comments-slug'}))
 
         response.data['url'] = response.data['url'][17:]
-        response.data['edit_url'] = response.data['edit_url'][17:]
+        # response.data['edit_url'] = response.data['edit_url'][17:]
         response.data['author'] = response.data['author'][17:]
         response.data['like_url'] = response.data['like_url'][17:]
 
@@ -537,7 +563,7 @@ class CreateNewPost(TestCase):
         response = client.post(
             reverse('new-post'),
             data=json.dumps({}),
-            content_type='application/json'
+            content_type='multipart/form-data'
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -552,7 +578,7 @@ class CreateNewPost(TestCase):
             reverse('new-post'),
             HTTP_AUTHORIZATION='Token {}'.format(self.token),
             data=json.dumps({}),
-            content_type='application/json'
+            content_type='multipart/form-data'
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -567,7 +593,7 @@ class CreateNewPost(TestCase):
             reverse('new-post'),
             HTTP_AUTHORIZATION='Token {}'.format(self.token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
-            content_type='application/json'
+            content_type='multipart/form-data'
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -577,15 +603,14 @@ class CreateNewPost(TestCase):
         client = Client()
 
         client.login(username=self.user.username, password=self.password)
-
+        header = {'content-type': 'multipart/form-data'}
         response = client.post(
             reverse('new-post'),
             HTTP_AUTHORIZATION='Token {}'.format(self.token),
-            data=json.dumps({"title": "Test title", "content": "Test content", "some_extra_field": "test value",
-                             "status": 1}),
-            content_type='application/json'
+            data=json.dumps({"title": "Test title", "content": "Test content",
+                             "some_extra_field": "test value", "status": 1}),
+            content_type='multipart/form-data'
         )
-
         post = Post.objects.all()[0]
 
         self.assertEqual(post.status, 0)
