@@ -199,11 +199,18 @@ class EditPost(APIView):
     # Title and content not empty, check this on client side
     def patch(self, request, slug, format=None):
         """ Edit post field """
+        post = self.get_object(slug)
         if self.request.user.is_authenticated and self.request.user.id == post.author.id:
-            post = self.get_object(slug)
             data = request.data.copy()
             if 'title' in data:
-                data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on.strftime('%Y-%m-%d')))
+                data['slug'] = slugify('{}-{}-{}'.format(
+                    request.data['title'],
+                    request.user.username,
+                    post.created_on.strftime('%Y-%m-%d'))
+                )
+                while Post.objects.filter(slug=slug).exists():
+                    slug = '{}-{}'.format(slug, get_random_string(length=2))
+                data['slug'] = slug
             else:
                 data['slug'] = post.slug
                 data['title'] = post.title
