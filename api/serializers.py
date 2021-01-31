@@ -64,6 +64,7 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     # tags = serializers.SerializerMethodField('get_tags')
     tags = TagSerializer(many=True, read_only=False, required=False)
+    image = serializers.ImageField(max_length=None, allow_empty_file=True, allow_null=True, required=False)
     # image_url = serializers.SerializerMethodField('get_image_url')
 
     class Meta:

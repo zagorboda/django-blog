@@ -199,25 +199,33 @@ class EditPost(APIView):
     # Title and content not empty, check this on client side
     def patch(self, request, slug, format=None):
         """ Edit post field """
-        post = self.get_object(slug)
         if self.request.user.is_authenticated and self.request.user.id == post.author.id:
-            if 'title' in request.data:
-                request.data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on.strftime('%Y-%m-%d')))
+            post = self.get_object(slug)
+            data = request.data.copy()
+            if 'title' in data:
+                data['slug'] = slugify('{}-{}-{}'.format(request.data['title'], request.user.username, post.created_on.strftime('%Y-%m-%d')))
             else:
-                request.data['slug'] = post.slug
-                request.data['title'] = post.title
+                data['slug'] = post.slug
+                data['title'] = post.title
             if 'content' not in request.data:
-                request.data['content'] = post.content
-            request.data['updated_on'] = datetime.now()
-            request.data['status'] = 0
+                data['content'] = post.content
+            data['updated_on'] = datetime.now()
+            data['status'] = 0
 
             tags_in_request = False
-            if 'tags' in request.data:
-                request_tags = request.data['tags']
-                del request.data['tags']
+            if 'tags' in data:
+                request_tags = data.getlist('tags')
+                del data['tags']
                 tags_in_request = True
 
-            serializer = PostDetailSerializer(post, data=request.data, context={'request': request})
+            if 'image_changed' in data:
+                if 'image' in data:
+                    if data['image'] == 'deleted':
+                        data['image'] = None
+            else:
+                data.image = post.image
+
+            serializer = PostDetailSerializer(post, data=data, context={'request': request})
             if serializer.is_valid():
                 serializer.save()
                 updated_post = self.get_object(slug)
@@ -228,8 +236,8 @@ class EditPost(APIView):
                     delete_tags = list(set(old_tags) - set(new_tags))
                     add_tags = list(set(new_tags) - set(old_tags))
 
-                updated_post.tags.remove(*[Tag.objects.get(tagline=tag) for tag in delete_tags])
-                updated_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in add_tags])
+                    updated_post.tags.remove(*[Tag.objects.get(tagline=tag) for tag in delete_tags])
+                    updated_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in add_tags])
 
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
