@@ -8,6 +8,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework.request import Request
 import json
 
+# from rest_framework.test import APIClient
+
 from .serializers import PostListSerializer, PostDetailSerializer, CommentSerializer, UserSerializer
 from blog_app.models import Post, Comment
 from .views import UserDetail
@@ -151,20 +153,25 @@ class PostDetailTest(TestCase):
     """ Test module for post detail page"""
 
     def setUp(self):
-        user1 = User.objects.create_user(username='test_user')
-        user1.set_password('test_password')
-        user1.save()
+        self.user1 = User.objects.create_user(username='test_user')
+        self.password1 = 'test_password'
+        self.user1.set_password(self.password1)
+        self.user1.save()
 
         self.test_user = User.objects.create(
             username='some_user'
         )
-        self.password = 'test_password'
-        self.test_user.set_password(self.password)
+        self.test_password = 'test_password'
+        self.test_user.set_password(self.test_password)
+        self.test_user.save()
+
+        self.token1 = Token.objects.create(user=self.user1)
+        # self.test_token = Token.objects.create(user=self.test_user)
 
         self.post1 = Post.objects.create(
             title="Title",
             content="Content",
-            author=user1,
+            author=self.user1,
             slug='slug',
             status=1
         )
@@ -194,16 +201,29 @@ class PostDetailTest(TestCase):
         )
 
     def test_get_post_detail(self):
-        """ Get detail for existing active post """
+        """ Get detail for existing active post by unauthorized user (different edit_url) """
         client = Client()
-        response = client.get(reverse('post-detail', kwargs={'slug': 'slug'}))
+        response = client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+            # HTTP_AUTHORIZATION='Token {}'.format(self.token1)
+        )
 
-        response.data['url'] = response.data['url'][17:]
-        response.data['edit_url'] = response.data['edit_url'][17:]
-        response.data['author'] = response.data['author'][17:]
+        factory = RequestFactory()
+        # factory.login(username=self.user1, password=self.password1)
+        # factory.credentials(HTTP_AUTHORIZATION='Token {}'.format(self.token1))
+
+        request = factory.get(
+            reverse('post-detail', kwargs={'slug': 'slug'})
+        )
+        test_request = Request(request)
+
+        # response.data['url'] = response.data['url'][17:]
+        # response.data['edit_url'] = response.data['edit_url'][17:]
+        # response.data['author'] = response.data['author'][17:]
+        # response.data['like_url'] = response.data['like_url'][17:]
 
         post = Post.objects.get(slug='slug')
-        serializer = PostDetailSerializer(post, context={'request': None})
+        serializer = PostDetailSerializer(post, context={'request': test_request})  # response.wsgi_request
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -233,7 +253,7 @@ class PostDetailTest(TestCase):
         """ Make POST request (create new comment) to post detail page by authorized user"""
         client = Client()
 
-        client.login(username=self.test_user.username, password=self.password)
+        client.login(username=self.test_user.username, password=self.test_password)
         token = Token.objects.create(user=self.test_user)
 
         response = client.post(
@@ -246,7 +266,7 @@ class PostDetailTest(TestCase):
         response.data['author'] = response.data['author'][17:]
 
         comment = Comment.objects.get(post=self.post1)
-        serializer = CommentSerializer(comment, context={'request': None})
+        serializer = CommentSerializer(comment, context={'request': None})  # request None?
 
         number_of_comments = Comment.objects.all().count()
 
@@ -258,7 +278,7 @@ class PostDetailTest(TestCase):
         """ Make POST request by authorized user with invalid data (empty body)"""
         client = Client()
 
-        client.login(username=self.test_user.username, password=self.password)
+        client.login(username=self.test_user.username, password=self.test_password)
         token = Token.objects.create(user=self.test_user)
 
         response = client.post(
@@ -282,13 +302,21 @@ class PostDetailTest(TestCase):
         client = Client()
         response = client.get(reverse('post-detail', kwargs={'slug': 'single-comment-slug'}))
 
-        response.data['url'] = response.data['url'][17:]
-        response.data['edit_url'] = response.data['edit_url'][17:]
-        response.data['author'] = response.data['author'][17:]
-        response.data['comments'][0]['author'] = response.data['comments'][0]['author'][17:]
+        # response.data['url'] = response.data['url'][17:]
+        # response.data['edit_url'] = response.data['edit_url'][17:]
+        # response.data['author'] = response.data['author'][17:]
+        # response.data['comments'][0]['author'] = response.data['comments'][0]['author'][17:]
+        # response.data['like_url'] = response.data['like_url'][17:]
+
+        factory = RequestFactory()
+
+        request = factory.get(
+            reverse('post-detail', kwargs={'slug': 'single-comment-slug'})
+        )
+        test_request = Request(request)
 
         post = Post.objects.get(slug='single-comment-slug')
-        serializer = PostDetailSerializer(post, context={'request': None})
+        serializer = PostDetailSerializer(post, context={'request': test_request})
 
         number_of_comments = Comment.objects.all().filter(post=post).count()
 
@@ -311,8 +339,9 @@ class PostDetailTest(TestCase):
         response = client.get(reverse('post-detail', kwargs={'slug': 'several-comments-slug'}))
 
         response.data['url'] = response.data['url'][17:]
-        response.data['edit_url'] = response.data['edit_url'][17:]
+        # response.data['edit_url'] = response.data['edit_url'][17:]
         response.data['author'] = response.data['author'][17:]
+        response.data['like_url'] = response.data['like_url'][17:]
 
         for comment in response.data['comments']:
             comment['author'] = comment['author'][17:]
@@ -534,7 +563,7 @@ class CreateNewPost(TestCase):
         response = client.post(
             reverse('new-post'),
             data=json.dumps({}),
-            content_type='application/json'
+            content_type='multipart/form-data'
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -549,7 +578,7 @@ class CreateNewPost(TestCase):
             reverse('new-post'),
             HTTP_AUTHORIZATION='Token {}'.format(self.token),
             data=json.dumps({}),
-            content_type='application/json'
+            content_type='multipart/form-data'
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -564,7 +593,7 @@ class CreateNewPost(TestCase):
             reverse('new-post'),
             HTTP_AUTHORIZATION='Token {}'.format(self.token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
-            content_type='application/json'
+            content_type='multipart/form-data'
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -574,15 +603,14 @@ class CreateNewPost(TestCase):
         client = Client()
 
         client.login(username=self.user.username, password=self.password)
-
+        header = {'content-type': 'multipart/form-data'}
         response = client.post(
             reverse('new-post'),
             HTTP_AUTHORIZATION='Token {}'.format(self.token),
-            data=json.dumps({"title": "Test title", "content": "Test content", "some_extra_field": "test value",
-                             "status": 1}),
-            content_type='application/json'
+            data=json.dumps({"title": "Test title", "content": "Test content",
+                             "some_extra_field": "test value", "status": 1}),
+            content_type='multipart/form-data'
         )
-
         post = Post.objects.all()[0]
 
         self.assertEqual(post.status, 0)
@@ -677,7 +705,6 @@ class UserCreateApiTest(TestCase):
 
         user = User.objects.get(username='valid_username')
         token = Token.objects.get(user=user)
-        # print(response.data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['username'], user.username)
@@ -829,3 +856,255 @@ class EditPostTest(TestCase):
 
         self.assertEqual(response.data['detail'], "You don't have permission to edit this post")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class SearchPostTest(TestCase):
+
+    def test_search_without_posts(self):
+        """ Make search request without any post created """
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=some_test_search')
+        )
+
+        self.assertEqual(response.data['results'], [])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_without_result(self):
+        """ Make search request with query, that doesn't match any existing post """
+        test_user = User.objects.create_user(username='test_user')
+
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=test_user,
+            slug='slug',
+            status=1
+        )
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=not_matching_pattern')
+        )
+
+        self.assertEqual(response.data['results'], [])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_with_single_result(self):
+        """ Make search request with query, that match single existing post """
+        test_user = User.objects.create_user(username='test_user')
+
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=test_user,
+            slug='slug',
+            status=1
+        )
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+        )
+
+        response.data['results'][0]['url'] = response.data['results'][0]['url'][17:]
+        response.data['results'][0]['author'] = response.data['results'][0]['author'][17:]
+
+        posts = Post.objects.filter(title__icontains='title', status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': None})
+
+        self.assertEqual(response.data['results'], serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_with_active_and_draft_results(self):
+        """ Make search request with query, that match both active and draft posts """
+        test_user = User.objects.create_user(username='test_user')
+
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=test_user,
+            slug='slug',
+            status=1
+        )
+        test_post = Post.objects.create(
+            title="Title",
+            content="draft",
+            author=test_user,
+            slug='draft-slug',
+            status=0
+        )
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+        )
+
+        response.data['results'][0]['url'] = response.data['results'][0]['url'][17:]
+        response.data['results'][0]['author'] = response.data['results'][0]['author'][17:]
+
+        posts = Post.objects.filter(title__icontains='title', status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': None})
+
+        self.assertEqual(response.data['results'], serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_with_several_results(self):
+        """ Make search request with query, that match several posts """
+        test_user = User.objects.create_user(username='test_user')
+
+        test_post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=test_user,
+            slug='slug',
+            status=1
+        )
+        test_post = Post.objects.create(
+            title="Title",
+            content="draft",
+            author=test_user,
+            slug='draft-slug',
+            status=1
+        )
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+        )
+
+        for i in range(len(response.data['results'])):
+            response.data['results'][i]['url'] = response.data['results'][i]['url'][17:]
+            response.data['results'][i]['author'] = response.data['results'][i]['author'][17:]
+
+        posts = Post.objects.filter(title__icontains='title', status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': None})
+
+        self.assertEqual(response.data['results'], serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_with_results_over_pagination(self):
+        """ Make search request with query, that match number of posts, greater than page size """
+        test_user = User.objects.create_user(username='test_user')
+
+        for i in range(15):
+            Post.objects.create(
+                title="Title{}".format(i),
+                content="Content{}".format(i),
+                author=test_user,
+                slug='slug{}'.format(i),
+                status=1
+            )
+
+        client = Client()
+        response = client.get(
+            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Truncate urls in result
+        for i in range(len(response.data['results'])):
+            response.data['results'][i]['url'] = response.data['results'][i]['url'][17:]
+            response.data['results'][i]['author'] = response.data['results'][i]['author'][17:]
+
+        result = [] # Collect data from response
+        result.extend(response.data['results'])
+
+        while response.data['links']['next']:
+            # Make request to next page if next page exists
+            response = client.get(response.data['links']['next'])
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+            # Truncate urls in result
+            for i in range(len(response.data['results'])):
+                response.data['results'][i]['url'] = response.data['results'][i]['url'][17:]
+                response.data['results'][i]['author'] = response.data['results'][i]['author'][17:]
+
+            # Collect data from response
+            result.extend(response.data['results'])
+
+        posts = Post.objects.filter(title__icontains='title', status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': None})
+
+        self.assertEqual(result, serializer.data)
+
+
+class PostLikesTest(TestCase):
+    def setUp(self):
+        self.password = 'test_password'
+        self.user = User.objects.create_user(username='test_user')
+        self.user.set_password(self.password)
+        self.user.save()
+
+        self.token = Token.objects.create(user=self.user)
+
+        self.post = Post.objects.create(
+            title="Title",
+            content="Content",
+            author=self.user,
+            slug='slug',
+            status=1
+        )
+
+        self.client = Client()
+
+    def test_no_likes(self):
+        response = self.client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+        )
+        self.assertEqual(response.data['total_likes'], 0)
+
+    def test_like_url_with_invalid_slug(self):
+        response = self.client.get(
+            reverse('post-like', kwargs={'slug': 'invalid_slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_like_url_with_unauthorised_user(self):
+        client = Client()
+        response = client.get(
+            reverse('post-like', kwargs={'slug': 'slug'}),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_like_url_with_authorised_user(self):
+        response = self.client.get(
+            reverse('post-like', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+        )
+
+        post = Post.objects.get(slug='slug')
+        self.assertEqual(post.likes.count(), 1)
+        self.assertEqual(response.data, {'updated': True, 'liked': True})
+        response = self.client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+        )
+        self.assertEqual(response.data['total_likes'], 1)
+
+    def test_like_url_with_several_get_request(self):
+        response = self.client.get(  # First request
+            reverse('post-like', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+        )
+        self.assertEqual(response.data, {'updated': True, 'liked': True})
+
+        post = Post.objects.get(slug='slug')
+        self.assertEqual(post.likes.count(), 1)
+
+        response = self.client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+        )
+        self.assertEqual(response.data['total_likes'], 1)
+
+        response = self.client.get(  # Second request
+            reverse('post-like', kwargs={'slug': 'slug'}),
+            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+        )
+        self.assertEqual(response.data, {'updated': True, 'liked': False})
+
+        post = Post.objects.get(slug='slug')
+        self.assertEqual(post.likes.count(), 0)
+
+        response = self.client.get(
+            reverse('post-detail', kwargs={'slug': 'slug'}),
+        )
+        self.assertEqual(response.data['total_likes'], 0)
