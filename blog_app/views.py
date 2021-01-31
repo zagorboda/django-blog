@@ -5,6 +5,7 @@ from django.http import HttpResponseRedirect, Http404  # HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.template.defaultfilters import slugify
 from django.urls import reverse
+from django.utils.crypto import get_random_string
 from django.views import generic
 from django.views.generic import RedirectView
 
@@ -213,11 +214,17 @@ def create_new_post(request):
             new_post = Post()
 
             new_post.title = form.cleaned_data['title']
+
             new_post.slug = slugify('{}-{}-{}'.format(
                 form.cleaned_data['title'],
                 request.user.username,
                 datetime.now().strftime('%Y-%m-%d'))
             )
+            slug = new_post.slug
+            while Post.objects.filter(slug=slug).exists():
+                slug = '{}-{}'.format(slug, get_random_string(length=2))
+            new_post.slug = slug
+
             new_post.content = form.cleaned_data['content']
             new_post.author = request.user
             new_post.created_on = datetime.now()
@@ -262,10 +269,16 @@ def edit_post(request, slug):
                 # set new data
                 updated_post = Post.objects.get(slug=slug)
                 updated_post.title = form.cleaned_data['title']
+
                 updated_post.slug = slugify('{}-{}-{}'.format(
                     form.cleaned_data['title'],
                     request.user.username,
-                    old_post.created_on.strftime('%Y-%m-%d')))
+                    old_post.created_on.strftime('%Y-%m-%d'))
+                )
+                while Post.objects.filter(slug=slug).exists():
+                    slug = '{}-{}'.format(slug, get_random_string(length=2))
+                updated_post.slug = slug
+
                 updated_post.content = form.cleaned_data['content']
                 updated_post.updated_on = datetime.now()
 
