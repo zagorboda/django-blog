@@ -1,4 +1,5 @@
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.conf.urls import url
 from django.http import Http404
 from django.shortcuts import redirect, get_object_or_404
@@ -150,14 +151,18 @@ class PostLikeAPIToggle(APIView):
 
 
 class UserList(generics.ListAPIView):
+    User = get_user_model()
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
 
 class UserDetail(generics.RetrieveAPIView):
     """ Return information about user """
+    User = get_user_model()
     queryset = User.objects.all()
     serializer_class = UserSerializer
+
+    query_set_name = 'user_profile'
 
     lookup_field = 'username'
 

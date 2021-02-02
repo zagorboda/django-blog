@@ -1,24 +1,26 @@
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.forms import UserCreationForm
+# from django.contrib.auth.forms import UserCreationForm
+from .forms import RegistratinoForm
 # from django.http import HttpResponseRedirect
 # from django.contrib.auth.decorators import login_required
 # from django.views.generic.detail import DetailView
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
 # from django.views import generic
 from django.contrib.auth import logout
+from django.contrib.auth import get_user_model
 
 from blog_app.models import Post
 
 
 def signup_view(request):
     if request.method == 'POST':
-        form = UserCreationForm(request.POST)
+        form = RegistratinoForm(request.POST)
         if form.is_valid():
             form.save()
             return redirect('user_app:login')
     else:
-        form = UserCreationForm()
+        form = RegistratinoForm()
     return render(request, 'user_app/signup.html', {'form': form})
 
 
@@ -37,6 +39,7 @@ def signup_view(request):
 def user_detail_view(request, name):
     context = dict()
     try:
+        User = get_user_model()
         user = User.objects.get(username=name)
         context['user_profile'] = user
         posts_list = Post.objects.filter(author=user, status=1)
