@@ -1,6 +1,7 @@
 from django.contrib.auth.decorators import login_required  # permission_required
 from django.contrib.postgres.search import SearchVector
 from django.core.paginator import Paginator
+from django.db.models import Q  # Search
 from django.http import HttpResponseRedirect, Http404  # HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.template.defaultfilters import slugify
@@ -12,7 +13,6 @@ from django.views.generic import RedirectView
 from hitcount.views import HitCountDetailView
 
 # from django.contrib.postgres.search import SearchVector  # Search
-from django.db.models import Q  # Search
 
 from .forms import NewPostForm, CommentForm
 from .models import Post, ReportPost, Tag
