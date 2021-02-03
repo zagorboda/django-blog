@@ -13,14 +13,14 @@ from rest_framework.decorators import api_view, action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
 # from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
 from blog_app.models import Post, Comment, Tag
-from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterSerializer
+from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, \
+    RegisterSerializer, RegisterUserSerializer
 
 from datetime import datetime
 
@@ -158,13 +158,21 @@ class UserList(generics.ListAPIView):
 
 class UserDetail(generics.RetrieveAPIView):
     """ Return information about user """
-    User = get_user_model()
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+    # User = get_user_model()
+    # queryset = User.objects.all()
+    # serializer_class = UserSerializer
 
     query_set_name = 'user_profile'
 
     lookup_field = 'username'
+
+    def get(self, request, username, *args, **kwargs):
+        User = get_user_model()
+        queryset = User.objects.get(username=username)
+
+        serializer = UserSerializer(queryset, context={'request': request})
+
+        return Response(serializer.data)
 
 
 class BlogMainPage(generics.ListAPIView):
@@ -291,7 +299,7 @@ class CreateNewPost(APIView):
     serializer_class = PostDetailSerializer
     # parser_class = (MultiPartParser,)
     # parser_classes = [gen_MultipartJsonParser(['title', 'content'])]
-    permission_classes = [IsAuthenticated, ]
+    permission_classes = [permissions.IsAuthenticated]
 
     # def dispatch(self, request, *args, **kwargs):
     #     p = request.POST  # Force evaluation of the Django request
@@ -365,21 +373,33 @@ class UserLoginApiView(ObtainAuthToken):
 #     serializer_class = RegisterSerializer
 
 
+# class UserCreateApiView(APIView):
+#
+#     def get(self, request):
+#         return Response()
+#
+#     def post(self, request, format=None):
+#         """ Check and save new user """
+#
+#         serializer = RegisterSerializer(data=request.data, context={'request': request})
+#         if serializer.is_valid():
+#             user = serializer.save()
+#             if user:
+#                 token = Token.objects.create(user=user)
+#                 json = serializer.data
+#                 json['token'] = token.key
+#                 return Response(json, status=status.HTTP_201_CREATED)
+#             return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class UserCreateApiView(APIView):
+    permission_classes = [permissions.AllowAny]
 
-    def get(self, request):
-        return Response()
-
-    def post(self, request, format=None):
-        """ Check and save new user """
-
-        serializer = RegisterSerializer(data=request.data, context={'request': request})
+    def post(self, request):
+        serializer = RegisterUserSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            if user:
-                token = Token.objects.create(user=user)
-                json = serializer.data
-                json['token'] = token.key
-                return Response(json, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
+            new_user = serializer.save()
+            if new_user:
+                return Response(status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
