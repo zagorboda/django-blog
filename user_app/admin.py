@@ -10,7 +10,6 @@ from .models import User
 
 class CustomUserAdmin(UserAdmin):
     standard_fieldsets = list(UserAdmin.fieldsets)[:]
-    print('standard = ', standard_fieldsets)
     fieldsets = standard_fieldsets.append((None, {'fields': ['bio']}))
 
 

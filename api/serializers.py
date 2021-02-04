@@ -1,7 +1,5 @@
-# from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
-from rest_framework import serializers, pagination
-# from django.contrib.auth.models import User
+from django.core import exceptions
 # from rest_framework.validators import UniqueValidator
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
@@ -230,23 +228,23 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 #         extra_kwargs = {'password': {'write_only': True}}
 
 
-class RegisterSerializer(serializers.ModelSerializer):
-
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
-
-    class Meta:
-        User = get_user_model()
-        model = User
-        fields = ('username', 'password')
-
-    def create(self, validated_data):
-        User = get_user_model()
-        user = User.objects.create_user(username=validated_data['username'])
-
-        user.set_password(validated_data['password'])
-        user.save()
-
-        return user
+# class RegisterSerializer(serializers.ModelSerializer):
+#
+#     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+#
+#     class Meta:
+#         User = get_user_model()
+#         model = User
+#         fields = ('username', 'password')
+#
+#     def create(self, validated_data):
+#         User = get_user_model()
+#         user = User.objects.create_user(username=validated_data['username'])
+#
+#         user.set_password(validated_data['password'])
+#         user.save()
+#
+#         return user
 
 
 class RegisterUserSerializer(serializers.ModelSerializer):
@@ -258,6 +256,15 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
+
+        errors = dict()
+        try:
+            validate_password(password=password)
+        except exceptions.ValidationError as e:
+            errors['password'] = list(e.messages)
+        if errors:
+            raise serializers.ValidationError(errors)
+
         instance = self.Meta.model(**validated_data)
         if password is not None:
             instance.set_password(password)

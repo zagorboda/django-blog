@@ -19,8 +19,8 @@ from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
 from blog_app.models import Post, Comment, Tag
-from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, \
-    RegisterSerializer, RegisterUserSerializer
+from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer,\
+    RegisterUserSerializer
 
 from datetime import datetime
 
@@ -168,7 +168,10 @@ class UserDetail(generics.RetrieveAPIView):
 
     def get(self, request, username, *args, **kwargs):
         User = get_user_model()
-        queryset = User.objects.get(username=username)
+        try:
+            queryset = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise Http404
 
         serializer = UserSerializer(queryset, context={'request': request})
 
