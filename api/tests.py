@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 # from rest_framework.test import APIRequestFactory
 from django.test.client import RequestFactory
-from rest_framework.authtoken.models import Token
+# from rest_framework.authtoken.models import Token
 from rest_framework.request import Request
 import json
 
@@ -158,10 +158,20 @@ class PostDetailTest(TestCase):
     def setUp(self):
         User = get_user_model()
 
+        client = Client()
+
         self.user1 = User.objects.create_user(username='test_user')
         self.password1 = 'test_password'
         self.user1.set_password(self.password1)
         self.user1.save()
+
+        response = client.post(
+            reverse('token_obtain_pair'),
+            data=json.dumps({'username': self.user1.username, 'password': self.password1}),
+            content_type='application/json'
+        )
+
+        self.auth_token1 = response.data['access']
 
         self.test_user = User.objects.create(
             username='some_user'
@@ -170,8 +180,13 @@ class PostDetailTest(TestCase):
         self.test_user.set_password(self.test_password)
         self.test_user.save()
 
-        self.token1 = Token.objects.create(user=self.user1)
-        # self.test_token = Token.objects.create(user=self.test_user)
+        response = client.post(
+            reverse('token_obtain_pair'),
+            data=json.dumps({'username': self.test_user.username, 'password': self.test_password}),
+            content_type='application/json'
+        )
+
+        self.test_auth_token = response.data['access']
 
         self.post1 = Post.objects.create(
             title="Title",
@@ -258,12 +273,12 @@ class PostDetailTest(TestCase):
         """ Make POST request (create new comment) to post detail page by authorized user"""
         client = Client()
 
-        client.login(username=self.test_user.username, password=self.test_password)
-        token = Token.objects.create(user=self.test_user)
+        # client.login(username=self.test_user.username, password=self.test_password)
+        # token = Token.objects.create(user=self.test_user)
 
         response = client.post(
             reverse('post-detail', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.test_auth_token),
             data=json.dumps({'body': "test"}),
             content_type='application/json'
         )
@@ -283,12 +298,12 @@ class PostDetailTest(TestCase):
         """ Make POST request by authorized user with invalid data (empty body)"""
         client = Client()
 
-        client.login(username=self.test_user.username, password=self.test_password)
-        token = Token.objects.create(user=self.test_user)
+        # client.login(username=self.test_user.username, password=self.test_password)
+        # token = Token.objects.create(user=self.test_user)
 
         response = client.post(
             reverse('post-detail', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.test_auth_token),
             data=json.dumps({}),
             content_type='application/json'
         )
@@ -378,6 +393,16 @@ class UserDetailTest(TestCase):
         self.user = User.objects.create_user(username='test_user')
         self.user.set_password(self.password)
         self.user.save()
+
+        client = Client()
+
+        response = client.post(
+            reverse('token_obtain_pair'),
+            data=json.dumps({'username': self.user.username, 'password': self.password}),
+            content_type='application/json'
+        )
+
+        self.auth_token = response.data['access']
 
     def test_get_existing_user_detail(self):
         """ Get detail for existing user without posts and comments"""
@@ -507,11 +532,11 @@ class UserDetailTest(TestCase):
 
         client = Client()
         client.login(username=self.user.username, password=self.password)
-        token = Token.objects.create(user=self.user)
+        # token = Token.objects.create(user=self.user)
 
         response = client.get(
             reverse('user-detail', kwargs={'username': 'test_user'}),
-            HTTP_AUTHORIZATION='Token {}'.format(token)
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token)
         )
 
         request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
@@ -573,7 +598,17 @@ class CreateNewPost(TestCase):
         self.user.set_password(self.password)
         self.user.save()
 
-        self.token = Token.objects.create(user=self.user)
+        client = Client()
+
+        response = client.post(
+            reverse('token_obtain_pair'),
+            data=json.dumps({'username': self.user.username, 'password': self.password}),
+            content_type='application/json'
+        )
+
+        self.auth_token = response.data['access']
+
+        # self.token = Token.objects.create(user=self.user)
 
     def test_post_request_by_unauthorized_user(self):
         """ Make POST request by unauthorized user """
@@ -595,7 +630,7 @@ class CreateNewPost(TestCase):
 
         response = client.post(
             reverse('new-post'),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({}),
             content_type='multipart/form-data'
         )
@@ -610,7 +645,7 @@ class CreateNewPost(TestCase):
 
         response = client.post(
             reverse('new-post'),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
             content_type='multipart/form-data'
         )
@@ -625,7 +660,7 @@ class CreateNewPost(TestCase):
         header = {'content-type': 'multipart/form-data'}
         response = client.post(
             reverse('new-post'),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content",
                              "some_extra_field": "test value", "status": 1}),
             content_type='multipart/form-data'
@@ -647,12 +682,10 @@ class UserLoginApiTest(TestCase):
         self.user.set_password(self.password)
         self.user.save()
 
-        self.token = Token.objects.create(user=self.user)
-
     def test_not_allowed_request(self):
         """ Make GET request (ObtainAuthToken process only POST request) """
         client = Client()
-        response = client.get(reverse('login'))
+        response = client.get(reverse('token_obtain_pair'))
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
@@ -661,36 +694,35 @@ class UserLoginApiTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('login'),
+            reverse('token_obtain_pair'),
             data=json.dumps({"username": "not_existing_username", "password": "some_password"}),
             content_type='application/json'
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_with_invalid_password(self):
         """ Make POST request with invalid password """
         client = Client()
 
         response = client.post(
-            reverse('login'),
+            reverse('token_obtain_pair'),
             data=json.dumps({"username": self.user.username, "password": "invalid_password"}),
             content_type='application/json'
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_with_valid_credentials(self):
         """ Make POST request with valid credentials for existing user """
         client = Client()
 
         response = client.post(
-            reverse('login'),
+            reverse('token_obtain_pair'),
             data=json.dumps({"username": self.user.username, "password": self.password}),
             content_type='application/json'
         )
 
-        self.assertEqual(Token.objects.all()[0].key, response.data['token'])
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
@@ -724,14 +756,7 @@ class UserCreateApiTest(TestCase):
             content_type='application/json'
         )
 
-        User = get_user_model()
-
-        user = User.objects.get(username='valid_username')
-        # token = Token.objects.get(user=user)
-
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        # self.assertEqual(response.data['username'], user.username)
-        # self.assertEqual(response.data['token'], token.key)
 
     def test_sign_up_existing_user(self):
         """ Make POST request with existing username """
@@ -774,7 +799,17 @@ class EditPostTest(TestCase):
         self.user.set_password(self.password)
         self.user.save()
 
-        self.token = Token.objects.create(user=self.user)
+        client = Client()
+
+        response = client.post(
+            reverse('token_obtain_pair'),
+            data=json.dumps({'username': self.user.username, 'password': self.password}),
+            content_type='application/json'
+        )
+
+        self.auth_token = response.data['access']
+
+        # self.token = Token.objects.create(user=self.user)
 
         self.test_post = Post.objects.create(
             title="Title",
@@ -790,7 +825,7 @@ class EditPostTest(TestCase):
 
         response = client.patch(
             reverse('edit-post', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
             content_type='application/json'
         )
@@ -808,7 +843,7 @@ class EditPostTest(TestCase):
 
         response = client.patch(
             reverse('edit-post', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": self.test_post.content}),
             content_type='application/json'
         )
@@ -826,7 +861,7 @@ class EditPostTest(TestCase):
 
         response = client.patch(
             reverse('edit-post', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"content": "Test content", "title": self.test_post.title}),
             content_type='application/json'
         )
@@ -844,7 +879,7 @@ class EditPostTest(TestCase):
 
         response = client.get(
             reverse('edit-post', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token)
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
 
         patched_post = Post.objects.all()[0]
@@ -874,13 +909,26 @@ class EditPostTest(TestCase):
         user.set_password(password)
         user.save()
 
-        token = Token.objects.create(user=user)
-
         client = Client()
+
+        User = get_user_model()
+
+        password = 'test_password'
+        another_user = User.objects.create_user(username='another_user')
+        another_user.set_password(self.password)
+        another_user.save()
+
+        response = client.post(
+            reverse('token_obtain_pair'),
+            data=json.dumps({'username': another_user.username, 'password': password}),
+            content_type='application/json'
+        )
+
+        another_auth_token = response.data['access']
 
         response = client.get(
             reverse('edit-post', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(token)
+            HTTP_AUTHORIZATION='JWT {}'.format(another_auth_token),
         )
 
         self.assertEqual(response.data['detail'], "You don't have permission to edit this post")
@@ -1073,7 +1121,17 @@ class PostLikesTest(TestCase):
         self.user.set_password(self.password)
         self.user.save()
 
-        self.token = Token.objects.create(user=self.user)
+        client = Client()
+
+        response = client.post(
+            reverse('token_obtain_pair'),
+            data=json.dumps({'username': self.user.username, 'password': self.password}),
+            content_type='application/json'
+        )
+
+        self.auth_token = response.data['access']
+
+        # self.token = Token.objects.create(user=self.user)
 
         self.post = Post.objects.create(
             title="Title",
@@ -1094,7 +1152,7 @@ class PostLikesTest(TestCase):
     def test_like_url_with_invalid_slug(self):
         response = self.client.get(
             reverse('post-like', kwargs={'slug': 'invalid_slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -1110,7 +1168,7 @@ class PostLikesTest(TestCase):
     def test_like_url_with_authorised_user(self):
         response = self.client.get(
             reverse('post-like', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
 
         post = Post.objects.get(slug='slug')
@@ -1124,7 +1182,7 @@ class PostLikesTest(TestCase):
     def test_like_url_with_several_get_request(self):
         response = self.client.get(  # First request
             reverse('post-like', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
         self.assertEqual(response.data, {'updated': True, 'liked': True})
 
@@ -1138,7 +1196,7 @@ class PostLikesTest(TestCase):
 
         response = self.client.get(  # Second request
             reverse('post-like', kwargs={'slug': 'slug'}),
-            HTTP_AUTHORIZATION='Token {}'.format(self.token),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
         self.assertEqual(response.data, {'updated': True, 'liked': False})
 

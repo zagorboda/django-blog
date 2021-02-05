@@ -265,7 +265,7 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError(errors)
 
-        instance = self.Meta.model(**validated_data)
+        instance = self.Meta.model.objects.create_user(**validated_data)
         if password is not None:
             instance.set_password(password)
         instance.save()

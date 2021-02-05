@@ -13,7 +13,7 @@ from datetime import datetime
 def create_new_user(username, password):
     """ Create new user """
     User = get_user_model()
-    
+
     user = User.objects.create(username=username)
     user.set_password(password)
     user.save()

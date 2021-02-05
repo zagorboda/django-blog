@@ -18,6 +18,8 @@ from rest_framework.reverse import reverse
 from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
+from rest_framework_simplejwt.tokens import RefreshToken
+
 from blog_app.models import Post, Comment, Tag
 from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer,\
     RegisterUserSerializer
@@ -72,7 +74,7 @@ class CustomPagination(pagination.PageNumberPagination):
                 reverse('new-post')
             )
         else:
-            response_data['login_url'] = self.request.build_absolute_uri(reverse('login'))
+            response_data['token_obtain_pair'] = self.request.build_absolute_uri(reverse('token_obtain_pair'))
             response_data['sign_up_url'] = self.request.build_absolute_uri(reverse('signup'))
 
         response_data['results'] = data
@@ -364,9 +366,9 @@ class CreateNewPost(APIView):
         return Response({"detail": "Incorrect content-type"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserLoginApiView(ObtainAuthToken):
-    """ Handle creating user authentication token """
-    renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
+# class UserLoginApiView(ObtainAuthToken):
+#     """ Handle creating user authentication token """
+#     renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
 
 
 # class UserCreateApiView(generics.CreateAPIView):
@@ -400,9 +402,22 @@ class UserCreateApiView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        print(request.data)
         serializer = RegisterUserSerializer(data=request.data)
         if serializer.is_valid():
             new_user = serializer.save()
             if new_user:
                 return Response(status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BlacklistTokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data['refresh_token']
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
