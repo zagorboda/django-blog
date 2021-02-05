@@ -33,7 +33,8 @@ class EmptyBlogMainPageTest(TestCase):
 class GetAllPostsTest(TestCase):
     """ Test module for get all Post objects if number of objects less than pagination_size"""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
         user = User.objects.create_user(username='test_user',
                                         password='test_password')
@@ -89,7 +90,8 @@ class GetAllPostsTest(TestCase):
 class GetAllPostsOverPaginationTest(TestCase):
     """ Test module for get all Post objects if number of objects greater than pagination_size"""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
         user = User.objects.create_user(username='test_user',
                                         password='test_password')
@@ -155,67 +157,68 @@ class MainPagePostRequestTest(TestCase):
 class PostDetailTest(TestCase):
     """ Test module for post detail page"""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
 
         client = Client()
 
-        self.user1 = User.objects.create_user(username='test_user')
-        self.password1 = 'test_password'
-        self.user1.set_password(self.password1)
-        self.user1.save()
+        cls.user1 = User.objects.create_user(username='test_user')
+        cls.password1 = 'test_password'
+        cls.user1.set_password(cls.password1)
+        cls.user1.save()
 
         response = client.post(
             reverse('token_obtain_pair'),
-            data=json.dumps({'username': self.user1.username, 'password': self.password1}),
+            data=json.dumps({'username': cls.user1.username, 'password': cls.password1}),
             content_type='application/json'
         )
 
-        self.auth_token1 = response.data['access']
+        cls.auth_token1 = response.data['access']
 
-        self.test_user = User.objects.create(
+        cls.test_user = User.objects.create(
             username='some_user'
         )
-        self.test_password = 'test_password'
-        self.test_user.set_password(self.test_password)
-        self.test_user.save()
+        cls.test_password = 'test_password'
+        cls.test_user.set_password(cls.test_password)
+        cls.test_user.save()
 
         response = client.post(
             reverse('token_obtain_pair'),
-            data=json.dumps({'username': self.test_user.username, 'password': self.test_password}),
+            data=json.dumps({'username': cls.test_user.username, 'password': cls.test_password}),
             content_type='application/json'
         )
 
-        self.test_auth_token = response.data['access']
+        cls.test_auth_token = response.data['access']
 
-        self.post1 = Post.objects.create(
+        cls.post1 = Post.objects.create(
             title="Title",
             content="Content",
-            author=self.user1,
+            author=cls.user1,
             slug='slug',
             status=1
         )
 
-        self.post2 = Post.objects.create(
+        cls.post2 = Post.objects.create(
             title="Draft Title",
             content="Content",
-            author=self.test_user,
+            author=cls.test_user,
             slug='draft-slug',
             status=0
         )
 
-        self.post_with_single_comment = Post.objects.create(
+        cls.post_with_single_comment = Post.objects.create(
             title="Title comment",
             content="Comment",
-            author=self.test_user,
+            author=cls.test_user,
             slug='single-comment-slug',
             status=1
         )
 
-        self.post_with_several_comments = Post.objects.create(
+        cls.post_with_several_comments = Post.objects.create(
             title="Title comments",
             content="Comments",
-            author=self.test_user,
+            author=cls.test_user,
             slug='several-comments-slug',
             status=1
         )
@@ -384,25 +387,26 @@ class UserDetailTest(TestCase):
     #  need a request to be passed to serializer. To make request I use RequestFactory(), then pass this
     #  request into Request() class and then pass it to serializer.
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
 
-        self.factory = RequestFactory()
+        cls.factory = RequestFactory()
 
-        self.password = 'test_password'
-        self.user = User.objects.create_user(username='test_user')
-        self.user.set_password(self.password)
-        self.user.save()
+        cls.password = 'test_password'
+        cls.user = User.objects.create_user(username='test_user')
+        cls.user.set_password(cls.password)
+        cls.user.save()
 
         client = Client()
 
         response = client.post(
             reverse('token_obtain_pair'),
-            data=json.dumps({'username': self.user.username, 'password': self.password}),
+            data=json.dumps({'username': cls.user.username, 'password': cls.password}),
             content_type='application/json'
         )
 
-        self.auth_token = response.data['access']
+        cls.auth_token = response.data['access']
 
     def test_get_existing_user_detail(self):
         """ Get detail for existing user without posts and comments"""
@@ -588,25 +592,27 @@ class UserDetailTest(TestCase):
 
 
 class CreateNewPost(TestCase):
-    def setUp(self):
+
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
 
-        self.factory = RequestFactory()
+        cls.factory = RequestFactory()
 
-        self.password = 'test_password'
-        self.user = User.objects.create_user(username='test_user')
-        self.user.set_password(self.password)
-        self.user.save()
+        cls.password = 'test_password'
+        cls.user = User.objects.create_user(username='test_user')
+        cls.user.set_password(cls.password)
+        cls.user.save()
 
         client = Client()
 
         response = client.post(
             reverse('token_obtain_pair'),
-            data=json.dumps({'username': self.user.username, 'password': self.password}),
+            data=json.dumps({'username': cls.user.username, 'password': cls.password}),
             content_type='application/json'
         )
 
-        self.auth_token = response.data['access']
+        cls.auth_token = response.data['access']
 
         # self.token = Token.objects.create(user=self.user)
 
@@ -672,15 +678,17 @@ class CreateNewPost(TestCase):
 
 
 class UserLoginApiTest(TestCase):
-    def setUp(self):
+
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
 
-        self.factory = RequestFactory()
+        cls.factory = RequestFactory()
 
-        self.password = 'test_password'
-        self.user = User.objects.create_user(username='test_user')
-        self.user.set_password(self.password)
-        self.user.save()
+        cls.password = 'test_password'
+        cls.user = User.objects.create_user(username='test_user')
+        cls.user.set_password(cls.password)
+        cls.user.save()
 
     def test_not_allowed_request(self):
         """ Make GET request (ObtainAuthToken process only POST request) """
@@ -791,30 +799,32 @@ class UserCreateApiTest(TestCase):
 
 
 class EditPostTest(TestCase):
-    def setUp(self):
+
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
 
-        self.password = 'test_password'
-        self.user = User.objects.create_user(username='test_user')
-        self.user.set_password(self.password)
-        self.user.save()
+        cls.password = 'test_password'
+        cls.user = User.objects.create_user(username='test_user')
+        cls.user.set_password(cls.password)
+        cls.user.save()
 
         client = Client()
 
         response = client.post(
             reverse('token_obtain_pair'),
-            data=json.dumps({'username': self.user.username, 'password': self.password}),
+            data=json.dumps({'username': cls.user.username, 'password': cls.password}),
             content_type='application/json'
         )
 
-        self.auth_token = response.data['access']
+        cls.auth_token = response.data['access']
 
         # self.token = Token.objects.create(user=self.user)
 
-        self.test_post = Post.objects.create(
+        cls.test_post = Post.objects.create(
             title="Title",
             content="Content",
-            author=self.user,
+            author=cls.user,
             slug='slug',
             status=1
         )
@@ -1113,35 +1123,37 @@ class SearchPostTest(TestCase):
 
 
 class PostLikesTest(TestCase):
-    def setUp(self):
+
+    @classmethod
+    def setUpTestData(cls):
         User = get_user_model()
 
-        self.password = 'test_password'
-        self.user = User.objects.create_user(username='test_user')
-        self.user.set_password(self.password)
-        self.user.save()
+        cls.password = 'test_password'
+        cls.user = User.objects.create_user(username='test_user')
+        cls.user.set_password(cls.password)
+        cls.user.save()
 
         client = Client()
 
         response = client.post(
             reverse('token_obtain_pair'),
-            data=json.dumps({'username': self.user.username, 'password': self.password}),
+            data=json.dumps({'username': cls.user.username, 'password': cls.password}),
             content_type='application/json'
         )
 
-        self.auth_token = response.data['access']
+        cls.auth_token = response.data['access']
 
         # self.token = Token.objects.create(user=self.user)
 
-        self.post = Post.objects.create(
+        cls.post = Post.objects.create(
             title="Title",
             content="Content",
-            author=self.user,
+            author=cls.user,
             slug='slug',
             status=1
         )
 
-        self.client = Client()
+        cls.client = Client()
 
     def test_no_likes(self):
         response = self.client.get(
