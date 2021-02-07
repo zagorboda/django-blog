@@ -1,6 +1,5 @@
-# from django.core.paginator import Paginator
-from rest_framework import serializers, pagination
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from django.core import exceptions
 # from rest_framework.validators import UniqueValidator
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
@@ -208,6 +207,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         return serializer.data
 
     class Meta:
+        User = get_user_model()
         model = User
         fields = ('url', 'id', 'username', 'posts', 'comments')
 
@@ -228,21 +228,48 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 #         extra_kwargs = {'password': {'write_only': True}}
 
 
-class RegisterSerializer(serializers.ModelSerializer):
+# class RegisterSerializer(serializers.ModelSerializer):
+#
+#     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+#
+#     class Meta:
+#         User = get_user_model()
+#         model = User
+#         fields = ('username', 'password')
+#
+#     def create(self, validated_data):
+#         User = get_user_model()
+#         user = User.objects.create_user(username=validated_data['username'])
+#
+#         user.set_password(validated_data['password'])
+#         user.save()
+#
+#         return user
 
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+
+class RegisterUserSerializer(serializers.ModelSerializer):
 
     class Meta:
+        User = get_user_model()
         model = User
         fields = ('username', 'password')
 
     def create(self, validated_data):
-        user = User.objects.create(username=validated_data['username'])
+        password = validated_data.pop('password', None)
 
-        user.set_password(validated_data['password'])
-        user.save()
+        errors = dict()
+        try:
+            validate_password(password=password)
+        except exceptions.ValidationError as e:
+            errors['password'] = list(e.messages)
+        if errors:
+            raise serializers.ValidationError(errors)
 
-        return user
+        instance = self.Meta.model.objects.create_user(**validated_data)
+        if password is not None:
+            instance.set_password(password)
+        instance.save()
+        return instance
 
 
 # class FilteredCommentSerializer(serializers.ListSerializer):

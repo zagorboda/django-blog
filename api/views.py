@@ -1,4 +1,5 @@
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.conf.urls import url
 from django.http import Http404
 from django.shortcuts import redirect, get_object_or_404
@@ -12,14 +13,16 @@ from rest_framework.decorators import api_view, action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
 # from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
+from rest_framework_simplejwt.tokens import RefreshToken
+
 from blog_app.models import Post, Comment, Tag
-from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterSerializer
+from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer,\
+    RegisterUserSerializer
 
 from datetime import datetime
 
@@ -71,7 +74,7 @@ class CustomPagination(pagination.PageNumberPagination):
                 reverse('new-post')
             )
         else:
-            response_data['login_url'] = self.request.build_absolute_uri(reverse('login'))
+            response_data['token_obtain_pair'] = self.request.build_absolute_uri(reverse('token_obtain_pair'))
             response_data['sign_up_url'] = self.request.build_absolute_uri(reverse('signup'))
 
         response_data['results'] = data
@@ -150,16 +153,31 @@ class PostLikeAPIToggle(APIView):
 
 
 class UserList(generics.ListAPIView):
+    User = get_user_model()
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
 
 class UserDetail(generics.RetrieveAPIView):
     """ Return information about user """
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+    # User = get_user_model()
+    # queryset = User.objects.all()
+    # serializer_class = UserSerializer
+
+    query_set_name = 'user_profile'
 
     lookup_field = 'username'
+
+    def get(self, request, username, *args, **kwargs):
+        User = get_user_model()
+        try:
+            queryset = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise Http404
+
+        serializer = UserSerializer(queryset, context={'request': request})
+
+        return Response(serializer.data)
 
 
 class BlogMainPage(generics.ListAPIView):
@@ -286,7 +304,7 @@ class CreateNewPost(APIView):
     serializer_class = PostDetailSerializer
     # parser_class = (MultiPartParser,)
     # parser_classes = [gen_MultipartJsonParser(['title', 'content'])]
-    permission_classes = [IsAuthenticated, ]
+    permission_classes = [permissions.IsAuthenticated]
 
     # def dispatch(self, request, *args, **kwargs):
     #     p = request.POST  # Force evaluation of the Django request
@@ -348,9 +366,9 @@ class CreateNewPost(APIView):
         return Response({"detail": "Incorrect content-type"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserLoginApiView(ObtainAuthToken):
-    """ Handle creating user authentication token """
-    renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
+# class UserLoginApiView(ObtainAuthToken):
+#     """ Handle creating user authentication token """
+#     renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
 
 
 # class UserCreateApiView(generics.CreateAPIView):
@@ -360,21 +378,45 @@ class UserLoginApiView(ObtainAuthToken):
 #     serializer_class = RegisterSerializer
 
 
+# class UserCreateApiView(APIView):
+#
+#     def get(self, request):
+#         return Response()
+#
+#     def post(self, request, format=None):
+#         """ Check and save new user """
+#
+#         serializer = RegisterSerializer(data=request.data, context={'request': request})
+#         if serializer.is_valid():
+#             user = serializer.save()
+#             if user:
+#                 token = Token.objects.create(user=user)
+#                 json = serializer.data
+#                 json['token'] = token.key
+#                 return Response(json, status=status.HTTP_201_CREATED)
+#             return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class UserCreateApiView(APIView):
+    permission_classes = [permissions.AllowAny]
 
-    def get(self, request):
-        return Response()
-
-    def post(self, request, format=None):
-        """ Check and save new user """
-
-        serializer = RegisterSerializer(data=request.data, context={'request': request})
+    def post(self, request):
+        serializer = RegisterUserSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            if user:
-                token = Token.objects.create(user=user)
-                json = serializer.data
-                json['token'] = token.key
-                return Response(json, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
+            new_user = serializer.save()
+            if new_user:
+                return Response(status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BlacklistTokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data['refresh_token']
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
