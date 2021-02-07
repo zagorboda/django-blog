@@ -15,16 +15,19 @@
         {{ error }}
     {% else %}
 
-        {{user_profile.username}}
+
+    <div class="container">
+        <p>{{user_profile.username}}</p>
+        <p>{{user_profile.bio | linebreaks}}</p>
+    </div>
 
         {% if posts_list %}
             <hr>
-            <h3>User posts</h3>
-
             <div class="container">
+                <h4>User posts</h4>
             {% for post in posts_list %}
                 <div class="row">
-                    <h3><a href="{% url 'blog_app:post_detail' post.slug %}">{{post.title}}</a></h3>
+                    <h4><a href="{% url 'blog_app:post_detail' post.slug %}">{{post.title}}</a></h4>
                     <p class="text-muted" style="width:100%;">{{ post.created_on}}</p>
                     <p>{{post.content|slice:":200" }}</p>
                 </div>

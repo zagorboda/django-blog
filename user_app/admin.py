@@ -4,22 +4,14 @@ from django.contrib.auth.models import User
 
 # from .models import UserProfile
 # from user_app.models import CustomUser
-
-# Define an inline admin descriptor for Employee model
-# which acts a bit like a singleton
-# class UserInline(admin.StackedInline):
-#     model = UserProfile
-#     can_delete = False
-#     verbose_name_plural = 'user'
+from django.contrib.auth.admin import UserAdmin
+from .models import User
 
 
-# Define a new User admin
-# class UserAdmin(BaseUserAdmin):
-#     inlines = (UserInline,)
+class CustomUserAdmin(UserAdmin):
+    standard_fieldsets = list(UserAdmin.fieldsets)[:]
+    print('standard = ', standard_fieldsets)
+    fieldsets = standard_fieldsets.append((None, {'fields': ['bio']}))
 
 
-# Re-register UserAdmin
-# admin.site.unregister(User)
-# admin.site.register(User, UserAdmin)
-
-# admin.site.register(CustomUser)
+admin.site.register(User, CustomUserAdmin)

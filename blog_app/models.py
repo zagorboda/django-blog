@@ -3,6 +3,7 @@ from django.db import models
 from django.urls import reverse
 from hitcount.models import HitCountMixin, HitCount
 from django.contrib.contenttypes.fields import GenericRelation
+from django.conf import settings
 # from django.utils.encoding import python_2_unicode_compatible
 
 STATUS = (
@@ -21,7 +22,7 @@ class Tag(models.Model):
 class Post(models.Model, HitCountMixin):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True)
-    author = models.ForeignKey('auth.User', related_name='posts', on_delete=models.CASCADE, default='')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='posts', on_delete=models.CASCADE, default='')
     updated_on = models.DateTimeField(auto_now=True)
     content = models.TextField()
     created_on = models.DateTimeField(auto_now_add=True)
@@ -29,7 +30,7 @@ class Post(models.Model, HitCountMixin):
 
     hit_count_generic = GenericRelation(HitCount, object_id_field='object_pk',
                                         related_query_name='hit_count_generic_relation')
-    likes = models.ManyToManyField('auth.User', blank=True, related_name='post_likes')
+    likes = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='post_likes')
     tags = models.ManyToManyField(Tag, blank=True)
 
     image = models.ImageField(upload_to='images/', blank=True)
@@ -55,7 +56,7 @@ class Post(models.Model, HitCountMixin):
 
 class Comment(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
-    author = models.ForeignKey('auth.User', related_name='comment_author', on_delete=models.CASCADE, default='')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='comment_author', on_delete=models.CASCADE, default='')
     body = models.TextField()
     created_on = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=False)
@@ -69,7 +70,7 @@ class Comment(models.Model):
 
 class ReportPost(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='report_post')
-    reports = models.ManyToManyField('auth.User', blank=True, related_name='post_reports', default=0)
+    reports = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='post_reports', default=0)
     total_reports = models.IntegerField(default=0)
 
     def get_number_of_reports(self):
