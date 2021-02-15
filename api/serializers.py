@@ -26,7 +26,7 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         # list_serializer_class = FilteredCommentSerializer
         model = Comment
-        fields = ('author', 'author_username', 'body', 'created_on', 'active')
+        fields = ('id', 'author', 'author_username', 'body', 'created_on', 'active')
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -60,6 +60,7 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     total_views = serializers.SerializerMethodField('get_hits_count')
     total_likes = serializers.SerializerMethodField('get_likes')
     like_url = serializers.SerializerMethodField('get_like_url')
+    report_url = serializers.SerializerMethodField('get_report_url')
 
     # tags = serializers.SerializerMethodField('get_tags')
     tags = TagSerializer(many=True, read_only=False, required=False)
@@ -69,7 +70,8 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Post
         fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
-                  'created_on', 'comments', 'total_views', 'total_likes', 'like_url', 'image', 'tags')
+                  'created_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'image', 'tags',
+                  'comments')
         extra_kwargs = {
             'tags': {'validators': []},
         }
@@ -96,6 +98,10 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     def get_like_url(self, obj):
         request = self.context['request']
         return reverse('post-like', kwargs={'slug': obj.slug}, request=request)
+
+    def get_report_url(self, obj):
+        request = self.context['request']
+        return reverse('report-post', kwargs={'slug': obj.slug}, request=request)
 
     def get_tags(self, obj):
         """ Return tags """

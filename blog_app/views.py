@@ -189,6 +189,7 @@ class PostDetail(HitCountDetailView):
             # Assign the current post to the comment
             new_comment.post = self.object
             new_comment.author = self.request.user
+            new_comment.active = True
             # Save the comment to the database
             new_comment.save()
         return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': kwargs['slug']}))

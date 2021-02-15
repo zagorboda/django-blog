@@ -20,7 +20,7 @@ from rest_framework.views import APIView
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from blog_app.models import Post, Comment, Tag
+from blog_app.models import Post, Comment, Tag, ReportPost, ReportComment
 from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer,\
     RegisterUserSerializer
 
@@ -149,6 +149,67 @@ class PostLikeAPIToggle(APIView):
             "updated": updated,
             "liked": liked
         }
+        return Response(data)
+
+
+class PostReportToggle(APIView):
+    """ View to report post """
+    def get(self, *args, **kwargs):
+        slug = self.kwargs.get("slug")
+        post = get_object_or_404(Post, slug=slug)
+        url_ = post.get_absolute_url()
+        user = self.request.user
+        result = {}
+        if user.is_authenticated:
+            if ReportPost.objects.filter(post=post).exists():
+                report = ReportPost.objects.get(post=post)
+                if not report.reports.filter(username=user.username).exists():
+                    report.total_reports += 1
+                    report.reports.add(user)
+                    report.save()
+                    data = {'updated': True}
+                else:
+                    data = {'updated': False, 'message': 'Post already reported'}
+            else:
+                report = ReportPost.objects.create(post=post)
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+                data = {'updated': True}
+        else:
+            data = {'message': 'You are not authenticated'}
+        return Response(data)
+
+
+class CommentReportToggle(APIView):
+    """ View to report comment """
+    def get(self, *args, **kwargs):
+        id = self.kwargs.get("id")
+        comment = Comment.objects.get(id=id)
+
+        slug = self.kwargs.get("slug")
+        post = Post.objects.get(slug=slug)
+        url_ = post.get_absolute_url()
+
+        user = self.request.user
+        if user.is_authenticated:
+            if ReportComment.objects.filter(comment=comment).exists():
+                report = ReportComment.objects.get(comment=comment)
+                if not report.reports.filter(username=user.username).exists():
+                    report.total_reports += 1
+                    report.reports.add(user)
+                    report.save()
+                    data = {'updated': True}
+                else:
+                    data = {'updated': False, 'message': 'Comment already reported'}
+            else:
+                report = ReportComment.objects.create(comment=comment)
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+                data = {'updated': True}
+        else:
+            data = {'message': 'You are not authenticated'}
         return Response(data)
 
 
