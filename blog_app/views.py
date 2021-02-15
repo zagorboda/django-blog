@@ -15,7 +15,7 @@ from hitcount.views import HitCountDetailView
 # from django.contrib.postgres.search import SearchVector  # Search
 
 from .forms import NewPostForm, CommentForm
-from .models import Post, ReportPost, Tag
+from .models import Post, ReportPost, Tag, Comment, ReportComment
 
 from datetime import datetime
 
@@ -156,6 +156,31 @@ class PostReportToggle(RedirectView):
         return url_
 
 
+class CommentReportToggle(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        id = self.kwargs.get("id")
+        comment = Comment.objects.get(id=id)
+
+        slug = self.kwargs.get("slug")
+        post = Post.objects.get(slug=slug)
+        url_ = post.get_absolute_url()
+
+        user = self.request.user
+        if user.is_authenticated:
+            if ReportComment.objects.filter(comment=comment).exists():
+                report = ReportComment.objects.get(comment=comment)
+                if not report.reports.filter(username=user.username).exists():
+                    report.total_reports += 1
+                    report.reports.add(user)
+                    report.save()
+            else:
+                report = ReportComment.objects.create(comment=comment)
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+        return url_
+
+
 class PostDetail(HitCountDetailView):
     """ Show single post """
     model = Post
@@ -190,6 +215,7 @@ class PostDetail(HitCountDetailView):
             # Assign the current post to the comment
             new_comment.post = self.object
             new_comment.author = self.request.user
+            new_comment.active = True
             # Save the comment to the database
             new_comment.save()
         return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': kwargs['slug']}))
@@ -198,7 +224,7 @@ class PostDetail(HitCountDetailView):
     #     context = super(PostDetail, self).get_context_data(**kwargs)
     #     blog_post_slug = self.kwargs['slug']
     #     if blog_post_slug not in self.request.session:
-    #         # bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
+    #         # bp = Post.objects.filter(slug=btoken log_post_slug).update(total_views=+1)
     #         # Insert the slug into the session as the user has seen it
     #         self.request.session[blog_post_slug] = blog_post_slug
     #     return context

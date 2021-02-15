@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 
-from .models import Post, Comment, ReportPost, Tag
+from .models import Post, Comment, ReportPost, Tag, ReportComment
 
 
 class PostAdmin(admin.ModelAdmin):
@@ -53,7 +53,7 @@ class CommentAdmin(admin.ModelAdmin):
         return obj.body[:100]
 
 
-class ReportAdmin(admin.ModelAdmin):
+class ReportPostAdmin(admin.ModelAdmin):
     list_display = ('post', 'total_reports', 'post_link')
     readonly_fields = ('total_reports',)
 
@@ -69,6 +69,30 @@ class ReportAdmin(admin.ModelAdmin):
     post_link.short_description = 'Admin post url'
 
 
+class ReportCommentAdmin(admin.ModelAdmin):
+    list_display = ('comment', 'total_reports', 'post_link', 'comment_link')
+    readonly_fields = ('total_reports',)
+
+    def total_reports(self, obj):
+        return obj.get_number_of_reports()
+
+    total_reports.admin_order_field = 'total_reports'
+
+    def post_link(self, obj):
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse('admin:%s_%s_change' % (obj._meta.app_label, obj.comment.post._meta.model_name), args=[obj.comment.post.id]),
+            obj.comment.post)
+        )
+    post_link.short_description = 'Admin post url'
+
+    def comment_link(self, obj):
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse('admin:%s_%s_change' % (obj._meta.app_label, obj.comment._meta.model_name), args=[obj.comment.id]),
+            obj.comment)
+        )
+    comment_link.short_description = 'Admin comment url'
+
+
 class TagAdmin(admin.ModelAdmin):
     list_display = ('tagline',)
     search_fields = ('tagline',)
@@ -76,5 +100,6 @@ class TagAdmin(admin.ModelAdmin):
 
 admin.site.register(Post, PostAdmin)
 admin.site.register(Comment, CommentAdmin)
-admin.site.register(ReportPost, ReportAdmin)
+admin.site.register(ReportPost, ReportPostAdmin)
+admin.site.register(ReportComment, ReportCommentAdmin)
 admin.site.register(Tag, TagAdmin)

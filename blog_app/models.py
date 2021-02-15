@@ -75,3 +75,12 @@ class ReportPost(models.Model):
 
     def get_number_of_reports(self):
         return self.reports.count()
+
+
+class ReportComment(models.Model):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='report_comment')
+    reports = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='comment_reports')
+    total_reports = models.IntegerField(default=0)
+
+    def get_number_of_reports(self):
+        return self.reports.count()
