@@ -1,5 +1,6 @@
 staticfiles/
 media/
+.idea/
 
 blog/.env
 

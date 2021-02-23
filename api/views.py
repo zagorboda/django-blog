@@ -249,7 +249,7 @@ class BlogMainPage(generics.ListAPIView):
     pagination_class = CustomPagination
 
     filter_backends = (filters.SearchFilter,)
-    search_fields = ('title', )
+    search_fields = ('title', 'tags__tagline')
 
     # filter_backends = (DynamicSearchFilter,)
 
