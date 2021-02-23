@@ -34,8 +34,8 @@ class BlogPostCounterMixin(object):
 
 class PostList(generic.ListView):
     """ Show list of most recent posts """
-    paginate_by = 5
-    queryset = Post.objects.filter(status=1).order_by('-created_on')[:10]
+    paginate_by = 10
+    queryset = Post.objects.filter(status=1).order_by('-created_on')
     template_name = 'blog_app/index.html'
 
 
