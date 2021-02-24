@@ -123,6 +123,8 @@ LOGIN_URL = 'user_app:login'
 LOGIN_REDIRECT_URL = 'blog_app:home'
 LOGOUT_REDIRECT_URL = 'blog_app:home'
 
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+
 # AUTH_PROFILE_MODULE = ""
 
 REST_FRAMEWORK = {
