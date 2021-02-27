@@ -6,6 +6,7 @@ from django.http import HttpResponseRedirect, Http404  # HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.template.defaultfilters import slugify
 from django.urls import reverse
+from django.utils.crypto import get_random_string
 from django.views import generic
 from django.views.generic import RedirectView
 
@@ -14,7 +15,7 @@ from hitcount.views import HitCountDetailView
 # from django.contrib.postgres.search import SearchVector  # Search
 
 from .forms import NewPostForm, CommentForm
-from .models import Post, ReportPost, Tag
+from .models import Post, ReportPost, Tag, Comment, ReportComment
 
 from datetime import datetime
 
@@ -155,6 +156,31 @@ class PostReportToggle(RedirectView):
         return url_
 
 
+class CommentReportToggle(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        id = self.kwargs.get("id")
+        comment = Comment.objects.get(id=id)
+
+        slug = self.kwargs.get("slug")
+        post = Post.objects.get(slug=slug)
+        url_ = post.get_absolute_url()
+
+        user = self.request.user
+        if user.is_authenticated:
+            if ReportComment.objects.filter(comment=comment).exists():
+                report = ReportComment.objects.get(comment=comment)
+                if not report.reports.filter(username=user.username).exists():
+                    report.total_reports += 1
+                    report.reports.add(user)
+                    report.save()
+            else:
+                report = ReportComment.objects.create(comment=comment)
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+        return url_
+
+
 class PostDetail(HitCountDetailView):
     """ Show single post """
     model = Post
@@ -198,7 +224,7 @@ class PostDetail(HitCountDetailView):
     #     context = super(PostDetail, self).get_context_data(**kwargs)
     #     blog_post_slug = self.kwargs['slug']
     #     if blog_post_slug not in self.request.session:
-    #         # bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
+    #         # bp = Post.objects.filter(slug=btoken log_post_slug).update(total_views=+1)
     #         # Insert the slug into the session as the user has seen it
     #         self.request.session[blog_post_slug] = blog_post_slug
     #     return context
@@ -214,11 +240,17 @@ def create_new_post(request):
             new_post = Post()
 
             new_post.title = form.cleaned_data['title']
+
             new_post.slug = slugify('{}-{}-{}'.format(
                 form.cleaned_data['title'],
                 request.user.username,
                 datetime.now().strftime('%Y-%m-%d'))
             )
+            slug = new_post.slug
+            while Post.objects.filter(slug=slug).exists():
+                slug = '{}-{}'.format(slug, get_random_string(length=2))
+            new_post.slug = slug
+
             new_post.content = form.cleaned_data['content']
             new_post.author = request.user
             new_post.created_on = datetime.now()
@@ -263,10 +295,16 @@ def edit_post(request, slug):
                 # set new data
                 updated_post = Post.objects.get(slug=slug)
                 updated_post.title = form.cleaned_data['title']
+
                 updated_post.slug = slugify('{}-{}-{}'.format(
                     form.cleaned_data['title'],
                     request.user.username,
-                    old_post.created_on.strftime('%Y-%m-%d')))
+                    old_post.created_on.strftime('%Y-%m-%d'))
+                )
+                while Post.objects.filter(slug=slug).exists():
+                    slug = '{}-{}'.format(slug, get_random_string(length=2))
+                updated_post.slug = slug
+
                 updated_post.content = form.cleaned_data['content']
                 updated_post.updated_on = datetime.now()
 

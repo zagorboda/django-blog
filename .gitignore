@@ -3,5 +3,4 @@ media/
 .idea/
 
 blog/.env
-
 *.pyc

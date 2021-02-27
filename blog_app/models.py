@@ -59,7 +59,7 @@ class Comment(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='comment_author', on_delete=models.CASCADE, default='')
     body = models.TextField()
     created_on = models.DateTimeField(auto_now_add=True)
-    active = models.BooleanField(default=False)
+    status = models.IntegerField(choices=STATUS, default=0)
 
     class Meta:
         ordering = ['created_on']

@@ -4,7 +4,121 @@
 
 {% block content %}
 
-<script>
+{% if request.status != 404 %}
+    <div class="container">
+        <div class="col-md-12">
+            <h1>{% block title %} {{ post.title }} {% endblock title %}</h1>
+            <p class="text-muted"><a href="{%url 'user_app:profile' post.author%}">{{ post.author }}</a> | {{ post.created_on }}</p>
+            {% if is_owner %}
+                <p><a href="{%url 'blog_app:edit_post' post.slug%}">Edit this post</a></p>
+            {% endif %}
+
+            {% if post.image %}
+            <img src="{{ post.image.url }}" alt="{{ post.title }}">
+            {% endif %}
+
+            <p>
+                {%for tag in tags%}
+                <span style="border:1px solid black;border-radius:10%;padding:0.3em;">
+                    {{tag}}&#8203;
+                </span>
+                {%endfor%}
+            </p>
+
+            <p class="text-muted"> Views: {% get_hit_count for post %} </p>
+            <p id="likes"> Likes: <span id="likes_count"> {{ post.likes.count }} </span></p>
+
+            <p><a href="{%url 'blog_app:post_report' post.slug%}">Report this post</a></p>
+
+            {% if user.is_authenticated %}
+
+                {% if is_liked %}
+                    <button class="btn btn-primary" name="like" id="like2" onclick="make_ajax_request(this)">Remove like</button>
+                {% else %}
+                    <button class="btn btn-primary" name="like" id="like1" onclick="make_ajax_request(this)">Like</button>
+                {% endif %}
+
+            {% endif %}
+
+            <p align="justify">{{ post.content | linebreaks }}</p>
+        </div>
+    </div>
+
+    <hr>
+
+    {% if post.comments.all %}
+    <div class="container">
+        <div class="col-md-12">
+            {% for comment in post.comments.all %}
+                {% if comment.status %}
+                    <div class="comments" style="padding: 10px;">
+                        <p class="font-weight-bold">
+                            <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
+                            <span class=" text-muted font-weight-normal">
+                                {{ comment.created_on }}
+                            </span>
+
+                            <span class="dropdown" id="more_comment">
+                                <button class="dropbtn btn">&#xFE19;</button>
+
+                            <span class="dropdown-content">
+                                <a href="{%url 'blog_app:post_report' post.slug comment.id%}">Report comment</a>
+                            </span>
+                            </span>
+                        </p>
+                        <p>{{ comment.body | linebreaks }}</p>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+<!--    {% if request.session.message %}-->
+<!--        <p>{{request.session.message}}</p>-->
+<!--    {% endif %}-->
+
+    {% if user.is_authenticated %}
+
+        <div class="container">
+            <h3>Leave a comment</h3>
+                <form method="post" style="margin-top: 1.3em;" class="mb-3">
+                    <textarea name="body"></textarea>
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary  btn-lg">Submit</button>
+                </form>
+        </div>
+
+    {% else %}
+        <div class="container">
+            <p>You must be logged in to leave comments</p>
+        </div>
+
+    {% endif %}
+
+    <style>
+        .dropdown {
+          position: relative;
+          display: inline-block;
+        }
+
+        .dropdown-content {
+          display: none;
+          position: absolute;
+          background-color: #f1f1f1;
+          min-width: 160px;
+          z-index: 1;
+        }
+
+        .dropdown-content a {
+          display: block;
+        }
+
+        .dropdown:hover .dropdown-content {display: block;}
+
+    </style>
+
+    <script>
     function make_ajax_request(elem){
             // create an AJAX call
             $.ajax({
@@ -38,90 +152,7 @@
 
             return false;
         };
-
-</script>
-
-{% if request.status != 404 %}
-    <div class="container">
-        <div class="col-md-12">
-            <h1>{% block title %} {{ post.title }} {% endblock title %}</h1>
-            <p class="text-muted"><a href="{%url 'user_app:profile' post.author%}">{{ post.author }}</a> | {{ post.created_on }}</p>
-            {% if is_owner %}
-                <p><a href="{%url 'blog_app:edit_post' post.slug%}">Edit this post</a></p>
-            {% endif %}
-
-            {% if post.image %}
-            <img src="{{ post.image.url }}" alt="{{ post.title }}">
-            {% endif %}
-
-            <p>
-                {%for tag in tags%}
-                <span style="border:1px solid black;border-radius:10%;padding:0.3em;">
-                    {{tag}}&#8203;
-                </span>
-                {%endfor%}
-            </p>
-
-            <p class="text-muted"> Views: {% get_hit_count for post %} </p>
-            <p id="likes"> Likes: <span id="likes_count"> {{ post.likes.count }} </span></p>
-
-            {% if user.is_authenticated %}
-
-                {% if is_liked %}
-                    <button class="btn btn-primary" name="like" id="like2" onclick="make_ajax_request(this)">Remove like</button>
-                {% else %}
-                    <button class="btn btn-primary" name="like" id="like1" onclick="make_ajax_request(this)">Like</button>
-                {% endif %}
-
-            {% endif %}
-
-            <p align="justify">{{ post.content | linebreaks }}</p>
-        </div>
-    </div>
-
-    <hr>
-
-    {% if post.comments.all %}
-    <div class="container">
-        <div class="col-md-12">
-            {% for comment in post.comments.all %}
-                {% if comment.active %}
-                    <div class="comments" style="padding: 10px;">
-                        <p class="font-weight-bold">
-                            <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
-                            <span class=" text-muted font-weight-normal">
-                                {{ comment.created_on }}
-                            </span>
-                        </p>
-                        {{ comment.body | linebreaks }}
-                    </div>
-                {% endif %}
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-
-<!--    {% if request.session.message %}-->
-<!--        <p>{{request.session.message}}</p>-->
-<!--    {% endif %}-->
-
-    {% if user.is_authenticated %}
-
-        <div class="container">
-            <h3>Leave a comment</h3>
-                <form method="post" style="margin-top: 1.3em;" class="mb-3">
-                    <textarea name="body"></textarea>
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary  btn-lg">Submit</button>
-                </form>
-        </div>
-
-    {% else %}
-        <div class="container">
-            <p>You must be logged in to leave comments</p>
-        </div>
-
-    {% endif %}
+    </script>
 
 {% else %}
 
