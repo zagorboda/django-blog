@@ -319,7 +319,7 @@ class PostDetailTest(TestCase):
             post=self.post_with_single_comment,
             author=self.test_user,
             body='Some new comment',
-            active=True
+            status=1
         )
 
         client = Client()
@@ -355,14 +355,14 @@ class PostDetailTest(TestCase):
                 post=self.post_with_several_comments,
                 author=self.test_user,
                 body='Some new comment {}'.format(i),
-                active=i % 2
+                status=i % 2
             )
 
         client = Client()
         response = client.get(reverse('post-detail', kwargs={'slug': 'several-comments-slug'}))
 
         response.data['url'] = response.data['url'][17:]
-        # response.data['edit_url'] = response.data['edit_url'][17:]
+        response.data['report_url'] = response.data['report_url'][17:]
         response.data['author'] = response.data['author'][17:]
         response.data['like_url'] = response.data['like_url'][17:]
 
@@ -524,14 +524,14 @@ class UserDetailTest(TestCase):
             body="test comment",
             post=test_post,
             author=self.user,
-            active=1
+            status=1
         )
 
         Comment.objects.create(
             body="test comment",
             post=test_post,
             author=self.user,
-            active=0
+            status=0
         )
 
         client = Client()
@@ -571,7 +571,7 @@ class UserDetailTest(TestCase):
             body="test comment",
             post=test_post,
             author=self.user,
-            active=1
+            status=1
         )
 
         client = Client()

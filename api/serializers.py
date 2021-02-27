@@ -21,12 +21,12 @@ class CommentSerializer(serializers.ModelSerializer):
     """ Serialize comments """
     author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
     author_username = serializers.ReadOnlyField(source='author.username')
-    active = serializers.ReadOnlyField()
+    status = serializers.ReadOnlyField()
 
     class Meta:
         # list_serializer_class = FilteredCommentSerializer
         model = Comment
-        fields = ('id', 'author', 'author_username', 'body', 'created_on', 'active')
+        fields = ('id', 'author', 'author_username', 'body', 'created_on', 'status')
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -78,7 +78,7 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     def get_active_comments(self, obj):
         """ Return only active comments (active=True) """
-        posts = Comment.objects.all().filter(active=True, post=obj)
+        posts = Comment.objects.all().filter(status=1, post=obj)
         serializer = CommentSerializer(posts, many=True, context={'request': self.context['request']})
         return serializer.data
 
