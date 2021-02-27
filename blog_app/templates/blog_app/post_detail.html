@@ -14,13 +14,14 @@
             {% endif %}
 
             {% if post.image %}
-            <img src="{{ post.image.url }}" alt="{{ post.title }}">
+                <img src="{{ post.image.url }}" alt="{{ post.title }}">
             {% endif %}
 
             <p>
                 {%for tag in tags%}
-                <span style="border:1px solid black;border-radius:10%;padding:0.3em;">
-                    {{tag}}&#8203;
+                <span style="padding:0.3em;">
+
+                    <a href="{%url 'blog_app:search' %}?q={{tag}}">#{{tag}}&#8203;</a>
                 </span>
                 {%endfor%}
             </p>
@@ -73,10 +74,6 @@
         </div>
     </div>
     {% endif %}
-
-<!--    {% if request.session.message %}-->
-<!--        <p>{{request.session.message}}</p>-->
-<!--    {% endif %}-->
 
     {% if user.is_authenticated %}
 
