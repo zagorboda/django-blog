@@ -1,6 +1,6 @@
 staticfiles/
 media/
+.idea/
 
 blog/.env
-
 *.pyc

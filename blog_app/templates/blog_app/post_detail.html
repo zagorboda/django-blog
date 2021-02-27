@@ -50,7 +50,7 @@
     <div class="container">
         <div class="col-md-12">
             {% for comment in post.comments.all %}
-                {% if comment.active %}
+                {% if comment.status %}
                     <div class="comments" style="padding: 10px;">
                         <p class="font-weight-bold">
                             <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
