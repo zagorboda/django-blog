@@ -33,8 +33,8 @@ class BlogPostCounterMixin(object):
 
 class PostList(generic.ListView):
     """ Show list of most recent posts """
-    paginate_by = 5
-    queryset = Post.objects.filter(status=1).order_by('-created_on')[:10]
+    paginate_by = 15
+    queryset = Post.objects.filter(status=1).order_by('-created_on')
     template_name = 'blog_app/index.html'
 
 
@@ -254,8 +254,6 @@ def create_new_post(request):
             new_post.content = form.cleaned_data['content']
             new_post.author = request.user
             new_post.created_on = datetime.now()
-            # new_post.updated_on = datetime.now()
-            new_post.status = 0
 
             new_post.image = form.cleaned_data['image']
 
