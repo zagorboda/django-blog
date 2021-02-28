@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Edit post</title>
+    <meta charset="UTF-8">
+</head>
+
+<body>
+
+    <form id="post_form" method="POST", enctype="multipart/form-data">
+        <ul>
+            <li>
+                <label for="post_title">Title:</label>
+                <input type="text" id="post_title" name="post_title">
+            </li>
+
+            <li>
+                <label for="post_content">Content:</label>
+                <input type="text" id="post_content" name="post_content">
+            </li>
+
+            <li>
+                <input type="file" id="file" name="file">
+                <button type="button" onclick="clear_file()">Clear</button>
+            </li>
+
+            <li>
+                <button type="button" onclick="send_data()">Edit post</button>
+            </li>
+
+            <li>
+                <input type="checkbox" id="delete_image">Delete image from post</input>
+            </li>
+        </ul>
+    </form>
+
+    <img src="" alt="" id="image_holder">
+
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <script>
+    // tags shoud be textarea?, determined by #. To get list of tags parse
+    // textarea and split by #.
+    axios.get('http://127.0.0.1:8000/api/blog/post/test-2-admin-2021-01-31/edit/', {
+      headers: {
+          'Authorization': 'Token 88c6d0f3a95156eb4397b0f40a854b2874f45526'
+      }
+    })
+    .then((response) => {
+      console.log(response['data']);
+      document.getElementById('post_title').value = response['data']['title']
+      document.getElementById('post_content').value = response['data']['content']
+      if (response['data']['image']){
+          document.getElementById('image_holder').src = response['data']['image']
+      }
+    }, (error) => {
+      console.log(error);
+    });
+
+    function clear_file(){
+      document.getElementById('file').value = "";
+    }
+
+    function send_data() {
+      url = 'http://127.0.0.1:8000/api/blog/post/test-2-admin-2021-01-31/edit/';
+
+      var post_formData = new FormData();
+      var post_imagefile = document.querySelector('#file');
+      console.log(post_imagefile);
+      console.log(post_imagefile.files);
+      image_changed = false;
+      if (document.getElementById("delete_image").checked){
+          post_formData.append("image", 'deleted');
+          image_changed = true
+      }
+      if (typeof post_imagefile.files !== 'undefined' && post_imagefile.files.length > 0) {
+          post_formData.set("image", post_imagefile.files[0]);
+          image_changed = true
+      }
+      post_formData.append("image_changed", image_changed);
+
+      post_formData.append('title', document.getElementById('post_title').value);
+      post_formData.append('content', document.getElementById('post_content').value);
+      var tags = ['music', 'sport', 'tech'];
+      for (var i = 0; i < tags.length; i++) {
+          post_formData.append('tags', tags[i]);
+      }
+
+      const request_headers = {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': 'Token 88c6d0f3a95156eb4397b0f40a854b2874f45526'
+      }
+
+      axios.patch(url, post_formData, {
+        headers: request_headers
+      });
+    }
+
+
+
+    </script>
+
+</body>
+
+</html>

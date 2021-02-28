@@ -20,6 +20,7 @@
     </div>
 </div>
 
+{% if page_obj.number %}
 <div class="container mb-5">
     <div class="pagination centered">
         <span class="step-links">
@@ -39,5 +40,6 @@
         </span>
     </div>
 </div>
+{% endif %}
 
 {%endblock%}

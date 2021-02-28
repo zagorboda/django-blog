@@ -1,3 +1,6 @@
-blog/settings.py
+staticfiles/
+media/
+.idea/
 
+blog/.env
 *.pyc

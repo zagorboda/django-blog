@@ -1,28 +1,30 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from django.urls import include, path
-# from rest_framework import routers
+
 from . import views
 
-# router = routers.DefaultRouter()
-# router.register(r'posts', views.PostViewSet, 'posts')
-# router.register(r'users', views.UserViewSet, 'user-detail')
 
-# user_detail = views.UserViewSet.as_view({
-#     'get': 'retrieve',
-# })
-
-# Wire up our API using automatic URL routing.
-# Additionally, we include login URLs for the browsable API.
 urlpatterns = [
-    # path('posts/', views.PostList.as_view(), name='post-list'),
-    # path('posts/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
 
     path('blog/', views.BlogMainPage.as_view(), name='blog_main_page'),
-    path('blog/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
+    path('blog/new-post/', views.CreateNewPost.as_view(), name='new-post'),
+    path('blog/post/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
+    path('blog/post/<str:slug>/edit/', views.EditPost.as_view(), name='edit-post'),
+    path('blog/post/<str:slug>/like/', views.PostLikeAPIToggle.as_view(), name='post-like'),
 
-    path('user/logout/', views.logout_view, name='logout'),
-    path('user/', views.UserList.as_view(), name='user-list'),
+    path('schema/', views.schema_view, name='schema'),
+
+    # path('user/', views.UserList.as_view(), name='user-list'),
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
 
     path('api-auth/', include('rest_framework.urls')),
+    path('login/', views.UserLoginApiView.as_view(), name='login'),
+    path('signup/', views.UserCreateApiView.as_view(), name='signup'),
     path('', views.api_root),
+
+    path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

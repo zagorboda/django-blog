@@ -19,7 +19,7 @@ from . import views
 
 app_name = 'user_app'
 urlpatterns = [
-    path('logout/', views.logout_view, name='logout'),
+    # path('login/', views.login, name='login'),
     path('', include('django.contrib.auth.urls'), name='account'),
     path('signup/', views.signup_view, name='signup'),
     path('profile/<str:name>/', views.user_detail_view, name='profile'),

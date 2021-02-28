@@ -15,16 +15,22 @@
         {{ error }}
     {% else %}
 
-        {{user_profile.username}}
+    <div class="container">
+        <h2>{{user_profile.username}}</h2>
+        <p>{{user_profile.bio | linebreaks}}</p>
+    </div>
+
+    <div>
+
+    </div>
 
         {% if posts_list %}
             <hr>
-            <h3>User posts</h3>
-
             <div class="container">
+                <h4>User posts</h4>
             {% for post in posts_list %}
                 <div class="row">
-                    <h3><a href="{% url 'blog_app:post_detail' post.slug %}">{{post.title}}</a></h3>
+                    <h4><a href="{% url 'blog_app:post_detail' post.slug %}">{{post.title}}</a></h4>
                     <p class="text-muted" style="width:100%;">{{ post.created_on}}</p>
                     <p>{{post.content|slice:":200" }}</p>
                 </div>
@@ -35,14 +41,14 @@
         {% endif %}
 
 
-    {% if comment_list %}
+    {% if comment_list and is_owner %}
         <hr>
         <h4>Your comments</h4>
         <div class="container">
             {% for comment in comment_list %}
                 <div class="row">
-                    <a href="{% url 'blog_app:post_detail' comment.post.slug %}">{{comment.post}}</a>
-                    <span class="text-muted">| {% if comment.active %} Active {%else%} Waiting for moderating{%endif%}</span>
+                    <a href="{% url 'blog_app:post_detail' comment.post.slug %}#{{comment.id}}">{{comment.post}}</a>
+<!--                    <span class="text-muted">| {% if comment.status %} Active {%else%} Waiting for moderating{%endif%}</span>-->
                 </div>
                 <div class="row">
                     <p>{{comment.body}}</p>
