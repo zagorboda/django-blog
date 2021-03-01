@@ -33,8 +33,8 @@ class BlogPostCounterMixin(object):
 
 class PostList(generic.ListView):
     """ Show list of most recent posts """
-    paginate_by = 5
-    queryset = Post.objects.filter(status=1).order_by('-created_on')[:10]
+    paginate_by = 15
+    queryset = Post.objects.filter(status=1).order_by('-created_on')
     template_name = 'blog_app/index.html'
 
 
@@ -43,10 +43,20 @@ def search(request):
         if 'q' in request.GET and request.GET.get('q'):
             page = request.GET.get('page', 1)
 
-            query = request.GET.get('q')
-            posts = Post.objects.filter(
-                Q(title__icontains=query) | Q(tags__tagline__icontains=query), status=1
-            ).distinct().order_by('-created_on')
+            query_list = request.GET.getlist('q')
+            a = [key for key in request.GET]
+            print(a)
+            print(query_list)
+            qs = [Q(title__icontains=keyword) | Q(tags__tagline__icontains=keyword) for keyword in query_list]
+            print(qs)
+            query = qs.pop()  # get the first element
+
+            for q in qs:
+                query |= q
+            posts = Post.objects.filter(query, status=1)
+            # posts = Post.objects.filter(
+            #     Q(title__icontains=query) | Q(tags__tagline__icontains=query), status=1
+            # ).distinct().order_by('-created_on')
             # posts = Post.objects.filter(
             #     title__icontains=query, tags__tagline__icontains=query, status=1
             # ).order_by('-created_on')
@@ -57,7 +67,7 @@ def search(request):
             posts = paginator.page(page)
 
             return render(request, 'blog_app/search.html',
-                          {'post_list': posts, 'query': query})
+                          {'post_list': posts, 'query': '&q='.join(query_list)})
         return render(request, 'blog_app/search.html')
 
 
@@ -254,8 +264,6 @@ def create_new_post(request):
             new_post.content = form.cleaned_data['content']
             new_post.author = request.user
             new_post.created_on = datetime.now()
-            # new_post.updated_on = datetime.now()
-            new_post.status = 0
 
             new_post.image = form.cleaned_data['image']
 

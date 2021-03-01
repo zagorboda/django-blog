@@ -14,13 +14,14 @@
             {% endif %}
 
             {% if post.image %}
-            <img src="{{ post.image.url }}" alt="{{ post.title }}">
+                <img src="{{ post.image.url }}" alt="{{ post.title }}">
             {% endif %}
 
             <p>
                 {%for tag in tags%}
-                <span style="border:1px solid black;border-radius:10%;padding:0.3em;">
-                    {{tag}}&#8203;
+                <span style="padding:0.3em;">
+
+                    <a href="{%url 'blog_app:search' %}?q={{tag}}">#{{tag}}&#8203;</a>
                 </span>
                 {%endfor%}
             </p>
@@ -51,7 +52,7 @@
         <div class="col-md-12">
             {% for comment in post.comments.all %}
                 {% if comment.status %}
-                    <div class="comments" style="padding: 10px;">
+                    <div class="comments" style="padding: 10px;" id="{{comment.id}}">
                         <p class="font-weight-bold">
                             <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
                             <span class=" text-muted font-weight-normal">
@@ -73,10 +74,6 @@
         </div>
     </div>
     {% endif %}
-
-<!--    {% if request.session.message %}-->
-<!--        <p>{{request.session.message}}</p>-->
-<!--    {% endif %}-->
 
     {% if user.is_authenticated %}
 

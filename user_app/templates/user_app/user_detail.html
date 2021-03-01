@@ -16,8 +16,12 @@
     {% else %}
 
     <div class="container">
-        <p>{{user_profile.username}}</p>
+        <h2>{{user_profile.username}}</h2>
         <p>{{user_profile.bio | linebreaks}}</p>
+    </div>
+
+    <div>
+
     </div>
 
         {% if posts_list %}
@@ -35,6 +39,26 @@
             </div>
 
         {% endif %}
+
+
+    {% if comment_list and is_owner %}
+        <hr>
+        <h4>Your comments</h4>
+        <div class="container">
+            {% for comment in comment_list %}
+                <div class="row">
+                    <a href="{% url 'blog_app:post_detail' comment.post.slug %}#{{comment.id}}">{{comment.post}}</a>
+<!--                    <span class="text-muted">| {% if comment.status %} Active {%else%} Waiting for moderating{%endif%}</span>-->
+                </div>
+                <div class="row">
+                    <p>{{comment.body}}</p>
+                </div>
+            <hr>
+            {% endfor %}
+        </div>
+    {% else %}
+
+    {% endif %}
 
     {% endif %}
 
