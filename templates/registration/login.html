@@ -11,6 +11,10 @@ Log in
     <p>Your username and password didn't match. Please try again.</p>
   {% endif %}
 
+  {%for message in messages%}
+    {{message}}
+  {% endfor %}
+
   <form method="post" action="{% url 'user_app:login' %}">
     {% csrf_token %}
     <table>
