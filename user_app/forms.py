@@ -1,8 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth import get_user_model
-
-# from .models import User
+from django.contrib.auth import get_user_model, authenticate
 
 
 class SignUpForm(UserCreationForm):
@@ -15,13 +13,25 @@ class SignUpForm(UserCreationForm):
 
     def clean_email(self):
         User = get_user_model()
-        if User.objects.filter(email=self.cleaned_data.get("email")).exists():
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
             raise forms.ValidationError("A user with that email already exists.")
+        return email
 
 
-class LoginForm(forms.Form):
-    email = forms.EmailField()
+class AuthenticationForm(forms.ModelForm):
+
     password = forms.PasswordInput()
 
     class Meta:
-        fields = ('password', 'email')
+        User = get_user_model()
+        model = User
+        fields = ('username', 'password')
+
+    def clean(self):
+        if self.is_valid():
+            username = self.cleaned_data['username']
+            password = self.cleaned_data['password']
+            if not authenticate(username=username, password=password):
+                raise forms.ValidationError("Invalid login")
+
