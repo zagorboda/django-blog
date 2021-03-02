@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core import exceptions
+from django.core.validators import validate_email
 # from rest_framework.validators import UniqueValidator
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
@@ -19,7 +20,7 @@ from rest_framework.reverse import reverse
 
 class CommentSerializer(serializers.ModelSerializer):
     """ Serialize comments """
-    author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
+    author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
     author_username = serializers.ReadOnlyField(source='author.username')
     status = serializers.ReadOnlyField()
 
@@ -48,9 +49,9 @@ class TagSerializer(serializers.ModelSerializer):
 
 class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     """ Serialize post, return list of comments """
-    url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
+    url = serializers.HyperlinkedIdentityField(view_name='api:post-detail', lookup_field='slug')
     author_username = serializers.ReadOnlyField(source='author.username')
-    author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
+    author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
 
     # comments = CommentSerializer(many=True, read_only=True)
     comments = serializers.SerializerMethodField('get_active_comments')
@@ -97,11 +98,11 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     def get_like_url(self, obj):
         request = self.context['request']
-        return reverse('post-like', kwargs={'slug': obj.slug}, request=request)
+        return reverse('api:post-like', kwargs={'slug': obj.slug}, request=request)
 
     def get_report_url(self, obj):
         request = self.context['request']
-        return reverse('report-post', kwargs={'slug': obj.slug}, request=request)
+        return reverse('api:report-post', kwargs={'slug': obj.slug}, request=request)
 
     def get_tags(self, obj):
         """ Return tags """
@@ -160,9 +161,9 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
 class PostListSerializer(serializers.HyperlinkedModelSerializer):
     """ Serialize posts; content length is 200 chars, don't return comments and edit_url"""
-    url = serializers.HyperlinkedIdentityField(view_name='post-detail', lookup_field='slug')
+    url = serializers.HyperlinkedIdentityField(view_name='api:post-detail', lookup_field='slug')
     author_username = serializers.ReadOnlyField(source='author.username')
-    author = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True, lookup_field='username')
+    author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
 
     total_views = serializers.SerializerMethodField('get_hits_count')
     content = serializers.SerializerMethodField('get_short_content')
@@ -188,7 +189,7 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
     """ Serialize user information """
-    url = serializers.HyperlinkedIdentityField(view_name='user-detail', lookup_field='username')
+    url = serializers.HyperlinkedIdentityField(view_name='api:user-detail', lookup_field='username')
     # posts = serializers.HyperlinkedRelatedField(many=True, view_name='post-detail', read_only=True,
     #                                             lookup_field='slug')
     posts = serializers.SerializerMethodField('get_user_posts')
@@ -258,10 +259,12 @@ class RegisterUserSerializer(serializers.ModelSerializer):
     class Meta:
         User = get_user_model()
         model = User
-        fields = ('username', 'password')
+        fields = ('username', 'email', 'password')
 
     def create(self, validated_data):
-        password = validated_data.pop('password', None)
+        password = validated_data.get('password', None)
+        username = validated_data.get('username', None)
+        email = validated_data.get('email', None)
 
         errors = dict()
         try:
@@ -271,9 +274,14 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError(errors)
 
+        try:
+            validate_email(email)
+        except exceptions.ValidationError as e:
+            raise serializers.ValidationError({'message': "Email is incorrect"})
+
+        if password is None:
+            raise serializers.ValidationError({'message': "Password can't be empty"})
         instance = self.Meta.model.objects.create_user(**validated_data)
-        if password is not None:
-            instance.set_password(password)
         instance.save()
         return instance
 

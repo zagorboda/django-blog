@@ -1,11 +1,14 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
+from django.contrib.auth import views as auth_views
+from django.urls import path, include, reverse_lazy
 
 from rest_framework_simplejwt import views as jwt_views
 
 from . import views
 
+app_name = 'api'
 
 urlpatterns = [
 
@@ -32,6 +35,9 @@ urlpatterns = [
     path('token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
     path('logout/blacklist/', views.BlacklistTokenView.as_view(), name='blacklist'),
+
+    path('confirm_email/<uidb64>/<token>/', views.ConfirmEmail.as_view(),
+         name='confirm_email'),
 ]
 
 if settings.DEBUG:

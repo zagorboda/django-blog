@@ -22,7 +22,6 @@ from .tokens import account_activation_token
 
 def signup_view(request):
     if request.method == 'POST':
-        print(request.POST)
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
@@ -108,7 +107,6 @@ def user_detail_view(request, name):
 
 def activate(request, uidb64, token):
     User = get_user_model()
-    print('here')
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)

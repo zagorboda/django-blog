@@ -1,9 +1,15 @@
 # from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model
+from django.contrib.sites.shortcuts import get_current_site
 from django.conf.urls import url
+from django.core.mail import EmailMultiAlternatives, EmailMessage
 from django.http import Http404
 from django.shortcuts import redirect, get_object_or_404
+from django.template.loader import render_to_string
 from django.utils.crypto import get_random_string
+from django.utils.encoding import force_bytes, force_text
+from django.utils.html import strip_tags
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.text import slugify
 
 from rest_framework import generics, status, permissions, pagination, filters, renderers, viewsets
@@ -40,19 +46,21 @@ from hitcount.views import HitCountMixin
 
 from rest_framework_swagger.views import get_swagger_view
 
+from .tokens import account_activation_token
+
 schema_view = get_swagger_view(title='Blog API')
 
 
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({
-        'blog': reverse('blog_main_page', request=request, format=format)
+        'blog': reverse('api:blog_main_page', request=request, format=format)
     })
 
 
 class CustomPagination(pagination.PageNumberPagination):
     page = 1
-    page_size = 10
+    page_size = 15
     page_size_query_param = 'page_size'
 
     def get_paginated_response(self, data):
@@ -68,14 +76,14 @@ class CustomPagination(pagination.PageNumberPagination):
 
         if self.request.user.is_authenticated:
             response_data['user_profile_url'] = self.request.build_absolute_uri(
-                reverse('user-detail', kwargs={'username': self.request.user})
+                reverse('api:user-detail', kwargs={'username': self.request.user})
             )
             response_data['create_new_post_url'] = self.request.build_absolute_uri(
-                reverse('new-post')
+                reverse('api:new-post')
             )
         else:
-            response_data['token_obtain_pair'] = self.request.build_absolute_uri(reverse('token_obtain_pair'))
-            response_data['sign_up_url'] = self.request.build_absolute_uri(reverse('signup'))
+            response_data['token_obtain_pair'] = self.request.build_absolute_uri(reverse('api:token_obtain_pair'))
+            response_data['sign_up_url'] = self.request.build_absolute_uri(reverse('api:signup'))
 
         response_data['results'] = data
 
@@ -465,10 +473,41 @@ class UserCreateApiView(APIView):
     def post(self, request):
         serializer = RegisterUserSerializer(data=request.data)
         if serializer.is_valid():
-            new_user = serializer.save()
-            if new_user:
+            serializer.validated_data['is_active'] = False
+            user = serializer.save()
+            print(user)
+            current_site = get_current_site(request)
+            mail_subject = 'Activate your account.'
+            message = render_to_string('registration/acc_active_email.html', {
+                'user': user,
+                'domain': current_site.domain,
+                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+                'token': account_activation_token.make_token(user),
+            })
+            print(message)
+            to_email = serializer.validated_data.get('email')
+            email = EmailMessage(
+                mail_subject, message, to=[to_email]
+            )
+            email.send()
+            if user:
                 return Response(status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ConfirmEmail(APIView):
+    def get(self, request, uidb64, token):
+        User = get_user_model()
+        try:
+            uid = force_text(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+        if user is not None and account_activation_token.check_token(user, token):
+            user.is_active = True
+            return Response({'message': 'Account activated'}, status=status.HTTP_200_OK)
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
 class BlacklistTokenView(APIView):
