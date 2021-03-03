@@ -12,6 +12,8 @@ app_name = 'api'
 
 urlpatterns = [
 
+    path('', views.api_root),
+
     path('blog/', views.BlogMainPage.as_view(), name='blog_main_page'),
     path('blog/new-post/', views.CreateNewPost.as_view(), name='new-post'),
     path('blog/post/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
@@ -22,21 +24,17 @@ urlpatterns = [
 
     path('schema/', views.schema_view, name='schema'),
 
-    # path('user/', views.UserList.as_view(), name='user-list'),
-    path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
-
     path('api-auth/', include('rest_framework.urls')),
     # path('login/', views.UserLoginApiView.as_view(), name='login'),
     path('signup/', views.UserCreateApiView.as_view(), name='signup'),
-    path('', views.api_root),
-
-    path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
-
     path('token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
     path('logout/blacklist/', views.BlacklistTokenView.as_view(), name='blacklist'),
 
-    path('confirm_email/<uidb64>/<token>/', views.ConfirmEmail.as_view(),
+    path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
+
+    path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
+    path('user/confirm_email/<uidb64>/<token>/', views.ConfirmEmail.as_view(),
          name='confirm_email'),
 ]
 

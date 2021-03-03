@@ -54,7 +54,8 @@ schema_view = get_swagger_view(title='Blog API')
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({
-        'blog': reverse('api:blog_main_page', request=request, format=format)
+        'blog': reverse('api:blog_main_page', request=request, format=format),
+        'schema': reverse('api:schema', request=request, format=format)
     })
 
 
@@ -468,6 +469,7 @@ class CreateNewPost(APIView):
 
 
 class UserCreateApiView(APIView):
+    """ Create new user """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -475,16 +477,14 @@ class UserCreateApiView(APIView):
         if serializer.is_valid():
             serializer.validated_data['is_active'] = False
             user = serializer.save()
-            print(user)
             current_site = get_current_site(request)
             mail_subject = 'Activate your account.'
-            message = render_to_string('registration/acc_active_email.html', {
+            message = render_to_string('registration/acc_active_email_api.html', {
                 'user': user,
                 'domain': current_site.domain,
                 'uid': urlsafe_base64_encode(force_bytes(user.pk)),
                 'token': account_activation_token.make_token(user),
             })
-            print(message)
             to_email = serializer.validated_data.get('email')
             email = EmailMessage(
                 mail_subject, message, to=[to_email]
@@ -496,6 +496,7 @@ class UserCreateApiView(APIView):
 
 
 class ConfirmEmail(APIView):
+    """ Confirm user email and activate account """
     def get(self, request, uidb64, token):
         User = get_user_model()
         try:
@@ -505,12 +506,14 @@ class ConfirmEmail(APIView):
             user = None
         if user is not None and account_activation_token.check_token(user, token):
             user.is_active = True
+            user.save()
             return Response({'message': 'Account activated'}, status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
 class BlacklistTokenView(APIView):
+    """ Blacklist JWT token """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
