@@ -1,4 +1,4 @@
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, password_validation
 from django.core import exceptions
 from django.core.validators import validate_email
 # from rest_framework.validators import UniqueValidator
@@ -255,6 +255,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class RegisterUserSerializer(serializers.ModelSerializer):
+    """ Serializer for user signup """
 
     class Meta:
         User = get_user_model()
@@ -268,7 +269,8 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 
         errors = dict()
         try:
-            validate_password(password=password)
+            password_validation.validate_password(password, self.context['request'].user)
+            # validate_password(password=password)
         except exceptions.ValidationError as e:
             errors['password'] = list(e.messages)
         if errors:
@@ -284,6 +286,32 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         instance = self.Meta.model.objects.create_user(**validated_data)
         instance.save()
         return instance
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """ Serializer for password change endpoint """
+    old_password = serializers.CharField(write_only=True, required=True)
+    new_password1 = serializers.CharField(write_only=True, required=True)
+    new_password2 = serializers.CharField(write_only=True, required=True)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Your old password was entered incorrectly. Please enter it again.')
+        return value
+
+    def validate(self, data):
+        if data['new_password1'] != data['new_password2']:
+            raise serializers.ValidationError({'new_password2': "The two password fields didn't match."})
+        password_validation.validate_password(data['new_password1'], self.context['request'].user)
+        return data
+
+    def save(self, **kwargs):
+        password = self.validated_data['new_password1']
+        user = self.context['request'].user
+        user.set_password(password)
+        user.save()
+        return user
 
 
 # class FilteredCommentSerializer(serializers.ListSerializer):

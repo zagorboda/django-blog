@@ -36,6 +36,8 @@ urlpatterns = [
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
     path('user/confirm_email/<uidb64>/<token>/', views.ConfirmEmail.as_view(),
          name='confirm_email'),
+    path('user/change_password/', views.ChangePassword.as_view(),
+         name='confirm_email'),
 ]
 
 if settings.DEBUG:

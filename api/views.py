@@ -28,7 +28,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from blog_app.models import Post, Comment, Tag, ReportPost, ReportComment
 from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer,\
-    RegisterUserSerializer
+    RegisterUserSerializer, ChangePasswordSerializer
 
 from datetime import datetime
 
@@ -510,6 +510,24 @@ class ConfirmEmail(APIView):
             return Response({'message': 'Account activated'}, status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class ChangePassword(APIView):
+    """ Endpoint to change user password
+
+    Arguments:
+        old_password - user old password
+        new_password1 - new user password
+        new_password2 - new user password
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        # TODO: blacklist and generate new JWT token
+        return Response(status=status.HTTP_200_OK)
 
 
 class BlacklistTokenView(APIView):
