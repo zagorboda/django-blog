@@ -1,13 +1,16 @@
 from django.contrib.auth import get_user_model, password_validation
 from django.core import exceptions
 from django.core.validators import validate_email
-# from rest_framework.validators import UniqueValidator
-from django.contrib.auth.password_validation import validate_password
-from rest_framework import serializers
+from django.utils.encoding import force_bytes, force_text
+from django.utils.http import urlsafe_base64_decode
 
-from blog_app.models import Post, Comment, Tag
+from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 from rest_framework.reverse import reverse
 
+from blog_app.models import Post, Comment, Tag
+
+from .tokens import password_reset_token
 
 # class FieldMixin(object):
 #     def get_field_names(self, *args, **kwargs):
@@ -314,8 +317,28 @@ class ChangePasswordSerializer(serializers.Serializer):
         return user
 
 
-# class FilteredCommentSerializer(serializers.ListSerializer):
-#     """ ListSerializer used to filter active comments """
-#     def to_representation(self, data):
-#         data = data.filter(active=True)
-#         return super(FilteredCommentSerializer, self).to_representation(data)
+class ResetPasswordEmailSerializer(serializers.Serializer):
+    """ Serializer for email input for password reset endpoint """
+
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """ Serializer for password reset """
+
+    new_password = serializers.CharField(write_only=True, required=True)
+
+    def save(self, **kwargs):
+        User = get_user_model()
+        try:
+            uid = force_text(urlsafe_base64_decode(self.context['uidb64']))
+            user = User.objects.get(pk=uid)
+        except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+        if user is not None:
+            if password_reset_token.check_token(user, self.context['token']):
+                password = self.validated_data['new_password']
+                user.set_password(password)
+                user.save()
+            else:
+                raise

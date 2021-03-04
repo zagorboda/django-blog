@@ -28,7 +28,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from blog_app.models import Post, Comment, Tag, ReportPost, ReportComment
 from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer,\
-    RegisterUserSerializer, ChangePasswordSerializer
+    RegisterUserSerializer, ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer
 
 from datetime import datetime
 
@@ -46,7 +46,7 @@ from hitcount.views import HitCountMixin
 
 from rest_framework_swagger.views import get_swagger_view
 
-from .tokens import account_activation_token
+from .tokens import account_activation_token, password_reset_token
 
 schema_view = get_swagger_view(title='Blog API')
 
@@ -60,6 +60,7 @@ def api_root(request, format=None):
 
 
 class CustomPagination(pagination.PageNumberPagination):
+    """ Custom pagination for posts """
     page = 1
     page_size = 15
     page_size_query_param = 'page_size'
@@ -92,7 +93,11 @@ class CustomPagination(pagination.PageNumberPagination):
 
 
 class PostDetail(GenericAPIView):
-    """ Return all information about post """
+    """ Return all information about post.
+
+    GET : return information.
+    POST : add new comment (user must be logged in, requires comment body).
+    """
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_object(self, *args, **kwargs):
@@ -222,10 +227,10 @@ class CommentReportToggle(APIView):
         return Response(data)
 
 
-class UserList(generics.ListAPIView):
-    User = get_user_model()
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+# class UserList(generics.ListAPIView):
+#     User = get_user_model()
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
 
 
 class UserDetail(generics.RetrieveAPIView):
@@ -286,7 +291,7 @@ class EditPost(APIView):
 
     # Title and content not empty, check this on client side
     def patch(self, request, slug, format=None):
-        """ Edit post field """
+        """ Edit post fields """
         post = self.get_object(slug)
         if self.request.user.is_authenticated and self.request.user.id == post.author.id:
             data = request.data.copy()
@@ -370,7 +375,12 @@ class EditPost(APIView):
 
 
 class CreateNewPost(APIView):
-    """ Create new post """
+    """ Create new post.
+
+    POST : usr must be logged in.
+    Requires : title, content, body.
+    Additional fields: tags(list of items).
+    """
     serializer_class = PostDetailSerializer
     # parser_class = (MultiPartParser,)
     # parser_classes = [gen_MultipartJsonParser(['title', 'content'])]
@@ -469,11 +479,14 @@ class CreateNewPost(APIView):
 
 
 class UserCreateApiView(APIView):
-    """ Create new user """
+    """ Create new user
+
+    POST : create new user.
+    Requires : username(unique), email(unique), password"""
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = RegisterUserSerializer(data=request.data)
+        serializer = RegisterUserSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.validated_data['is_active'] = False
             user = serializer.save()
@@ -515,7 +528,7 @@ class ConfirmEmail(APIView):
 class ChangePassword(APIView):
     """ Endpoint to change user password
 
-    Arguments:
+    Patch:
         old_password - user old password
         new_password1 - new user password
         new_password2 - new user password
@@ -526,6 +539,50 @@ class ChangePassword(APIView):
         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        # TODO: blacklist and generate new JWT token
+        return Response(status=status.HTTP_200_OK)
+
+
+class ResetPasswordEmail(APIView):
+    """ Send password reset email to user """
+
+    def post(self, request):
+        """ Send email to user email """
+        serializer = ResetPasswordEmailSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data.get('email')
+            User = get_user_model()
+            if User.objects.filter(email=email).exists():
+                user = User.objects.get(email=email)
+
+                protocol = request.build_absolute_uri().split(':')[0] # TODO
+                current_site = get_current_site(request)
+                mail_subject = 'Password reset for django blog'
+                message = render_to_string('registration/password_reset_email_api.html', {
+                    'user': user,
+                    'email': email,
+                    'domain': current_site.domain,
+                    'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+                    'token': password_reset_token.make_token(user),
+                    'protocol': protocol,
+                })
+                to_email = email
+                email = EmailMessage(
+                    mail_subject, message, to=[to_email]
+                )
+                email.send()
+            return Response(status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResetPassword(APIView):
+    """ Receive and update user password """
+
+    def patch(self, request, uidb64, token):
+        serializer = ResetPasswordSerializer(data=request.data,
+                                             context={'request': request, 'token': token, 'uidb64': uidb64})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         # TODO: blacklist and generate new JWT token
         return Response(status=status.HTTP_200_OK)
 

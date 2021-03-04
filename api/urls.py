@@ -37,7 +37,11 @@ urlpatterns = [
     path('user/confirm_email/<uidb64>/<token>/', views.ConfirmEmail.as_view(),
          name='confirm_email'),
     path('user/change_password/', views.ChangePassword.as_view(),
-         name='confirm_email'),
+         name='change_password'),
+    path('user/reset_password/', views.ResetPasswordEmail.as_view(),
+         name='email_reset_password'),
+    path('user/reset_password/<uidb64>/<token>/', views.ResetPassword.as_view(),
+         name='reset_password'),
 ]
 
 if settings.DEBUG:

@@ -11,4 +11,15 @@ class TokenGenerator(PasswordResetTokenGenerator):
         )
 
 
+class ResetPassword(PasswordResetTokenGenerator):
+    """ Generate token to reset password via email """
+    def _make_hash_value(self, user, timestamp):
+        return (
+            six.text_type(user.pk) + six.text_type(timestamp) + six.text_type(user.is_active) +
+            six.text_type(user.email) + six.text_type(user.password)
+        )
+
+
 account_activation_token = TokenGenerator()
+
+password_reset_token = ResetPassword()
