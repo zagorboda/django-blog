@@ -24,7 +24,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from blog_app.models import Post, Comment, Tag, ReportPost, ReportComment
 from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer,\
-    RegisterUserSerializer, ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer
+    RegisterUserSerializer, ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer, \
+    EditProfileSerializer
 
 from datetime import datetime
 
@@ -518,6 +519,23 @@ class ResetPassword(APIView):
         serializer.save()
         # TODO: blacklist and generate new JWT token
         return Response(status=status.HTTP_200_OK)
+
+
+class EditProfile(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        serializer = EditProfileSerializer(request.user, context={'request': request})
+        return Response(serializer.data)
+
+    def patch(self, request):
+        user = request.user
+
+        serializer = EditProfileSerializer(user, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors)
 
 
 class BlacklistTokenView(APIView):

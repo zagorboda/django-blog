@@ -219,7 +219,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         User = get_user_model()
         model = User
-        fields = ('url', 'id', 'username', 'posts', 'comments')
+        fields = ('url', 'id', 'username', 'bio', 'posts', 'comments')
 
 
 # class CreateUserSerializer(serializers.ModelSerializer):
@@ -342,3 +342,18 @@ class ResetPasswordSerializer(serializers.Serializer):
                 user.save()
             else:
                 raise
+
+
+class EditProfileSerializer(serializers.ModelSerializer):
+
+    def update(self, instance, validated_data):
+        return super().update(instance, validated_data)
+
+    class Meta:
+        User = get_user_model()
+        model = User
+        fields = ('username', 'bio', 'email')
+        extra_kwargs = {
+            'username': {'read_only': True},
+            'email': {'read_only': True},
+        }

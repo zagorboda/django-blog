@@ -23,6 +23,7 @@ urlpatterns = [
     path('schema/', views.schema_view, name='schema'),
     path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
 
+    path('user/edit_profile/', views.EditProfile.as_view(), name='edit_profile'),
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
     path('user/signup/', views.UserCreateApiView.as_view(), name='signup'),
     path('user/token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
