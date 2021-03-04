@@ -90,7 +90,7 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         """ Return url to edit-post view """
         request = self.context['request']
         if request and request.user.id == obj.author.id:
-            return reverse('edit-post', kwargs={'slug': obj.slug}, request=request)
+            return reverse('api:edit-post', kwargs={'slug': obj.slug}, request=request)
         return None
 
     def get_hits_count(self, obj):
@@ -187,7 +187,7 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
 
     def get_like_url(self, obj):
         request = self.context['request']
-        return reverse('post-like', kwargs={'slug': obj.slug}, request=request)
+        return reverse('api:post-like', kwargs={'slug': obj.slug}, request=request)
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

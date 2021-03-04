@@ -1,8 +1,6 @@
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import include, path
-from django.contrib.auth import views as auth_views
-from django.urls import path, include, reverse_lazy
+from django.urls import path, include
 
 from rest_framework_simplejwt import views as jwt_views
 
@@ -23,17 +21,13 @@ urlpatterns = [
     path('blog/post/<str:slug>/report/<int:id>/', views.CommentReportToggle.as_view(), name='report-comment'),
 
     path('schema/', views.schema_view, name='schema'),
-
-    path('api-auth/', include('rest_framework.urls')),
-    # path('login/', views.UserLoginApiView.as_view(), name='login'),
-    path('signup/', views.UserCreateApiView.as_view(), name='signup'),
-    path('token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
-    path('logout/blacklist/', views.BlacklistTokenView.as_view(), name='blacklist'),
-
     path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
 
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
+    path('user/signup/', views.UserCreateApiView.as_view(), name='signup'),
+    path('user/token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('user/token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
+    path('user/token/blacklist/', views.BlacklistTokenView.as_view(), name='blacklist'),
     path('user/confirm_email/<uidb64>/<token>/', views.ConfirmEmail.as_view(),
          name='confirm_email'),
     path('user/change_password/', views.ChangePassword.as_view(),

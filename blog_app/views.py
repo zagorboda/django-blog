@@ -45,10 +45,7 @@ def search(request):
 
             query_list = request.GET.getlist('q')
             a = [key for key in request.GET]
-            print(a)
-            print(query_list)
             qs = [Q(title__icontains=keyword) | Q(tags__tagline__icontains=keyword) for keyword in query_list]
-            print(qs)
             query = qs.pop()  # get the first element
 
             for q in qs:
@@ -244,7 +241,6 @@ class PostDetail(HitCountDetailView):
 def create_new_post(request):
     """ Create form to add new post """
     if request.method == 'POST':
-        print('Files = ', request.FILES)
         form = NewPostForm(request.POST, request.FILES)
         if form.is_valid():
             new_post = Post()

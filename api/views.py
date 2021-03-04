@@ -1,27 +1,23 @@
-# from django.contrib.auth.models import User
 from django.contrib.auth import get_user_model
 from django.contrib.sites.shortcuts import get_current_site
-from django.conf.urls import url
-from django.core.mail import EmailMultiAlternatives, EmailMessage
+from django.core.mail import EmailMessage
 from django.http import Http404
-from django.shortcuts import redirect, get_object_or_404
+from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.crypto import get_random_string
 from django.utils.encoding import force_bytes, force_text
-from django.utils.html import strip_tags
+# from django.utils.html import strip_tags
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.text import slugify
 
-from rest_framework import generics, status, permissions, pagination, filters, renderers, viewsets
-from rest_framework.authtoken.models import Token
-from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.decorators import api_view, action
+from rest_framework import generics, status, permissions, pagination, filters
+from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
 # from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
-from rest_framework.settings import api_settings
+# from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -32,17 +28,10 @@ from .serializers import UserSerializer, PostListSerializer, PostDetailSerialize
 
 from datetime import datetime
 
-from django.http import QueryDict
 import json
-from rest_framework import parsers
 
-from hitcount.views import HitCountDetailView
+from hitcount.views import HitCountDetailView, HitCountMixin
 from hitcount.models import HitCount
-from hitcount.views import HitCountMixin
-
-# from .permissions import IsOwnerOrReadOnly
-# from django.contrib.auth import logout
-# from .filters import DynamicSearchFilter
 
 from rest_framework_swagger.views import get_swagger_view
 
@@ -55,7 +44,8 @@ schema_view = get_swagger_view(title='Blog API')
 def api_root(request, format=None):
     return Response({
         'blog': reverse('api:blog_main_page', request=request, format=format),
-        'schema': reverse('api:schema', request=request, format=format)
+        'user': reverse('api:schema', request=request, format=format),
+        'schema': reverse('api:schema', request=request, format=format),
     })
 
 
@@ -83,9 +73,19 @@ class CustomPagination(pagination.PageNumberPagination):
             response_data['create_new_post_url'] = self.request.build_absolute_uri(
                 reverse('api:new-post')
             )
+            response_data['change_password'] = self.request.build_absolute_uri(
+                reverse('api:change_password')
+            )
         else:
-            response_data['token_obtain_pair'] = self.request.build_absolute_uri(reverse('api:token_obtain_pair'))
-            response_data['sign_up_url'] = self.request.build_absolute_uri(reverse('api:signup'))
+            response_data['reset_password'] = self.request.build_absolute_uri(
+                reverse('api:email_reset_password')
+            )
+            response_data['token_obtain_pair'] = self.request.build_absolute_uri(
+                reverse('api:token_obtain_pair')
+            )
+            response_data['sign_up_url'] = self.request.build_absolute_uri(
+                reverse('api:signup')
+            )
 
         response_data['results'] = data
 
@@ -128,7 +128,6 @@ class PostDetail(GenericAPIView):
             serializer.save(author=self.request.user, created_on=datetime.now(), post=post)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
     def get_serializer_class(self):
         """ Return serializer class for different requests """
@@ -344,36 +343,6 @@ class EditPost(APIView):
         return Response({'detail': "You don't have permission to edit this post"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-# def gen_MultipartJsonParser(json_fields):
-#     print('here get')
-#
-#     class MultipartJsonParser(parsers.MultiPartParser):
-#         print()
-#         def parse(self, stream, media_type=None, parser_context=None):
-#             result = super().parse(
-#                 stream,
-#                 media_type=media_type,
-#                 parser_context=parser_context
-#             )
-#             data = {}
-#             # find the data field and parse it
-#             qdict = QueryDict('', mutable=True)
-#             for json_field in json_fields:
-#                 json_data = result.data.get(json_field, None)
-#                 if not json_data:
-#                     continue
-#                 data = json.loads(json_data)
-#                 if type(data) == list:
-#                     for d in data:
-#                         qdict.update({json_field: d})
-#                 else:
-#                     qdict.update({json_field: data})
-#
-#             return parsers.DataAndFiles(qdict, result.files)
-#
-#     return MultipartJsonParser
-
-
 class CreateNewPost(APIView):
     """ Create new post.
 
@@ -385,10 +354,6 @@ class CreateNewPost(APIView):
     # parser_class = (MultiPartParser,)
     # parser_classes = [gen_MultipartJsonParser(['title', 'content'])]
     permission_classes = [permissions.IsAuthenticated]
-
-    # def dispatch(self, request, *args, **kwargs):
-    #     p = request.POST  # Force evaluation of the Django request
-    #     return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
         return Response()
@@ -444,38 +409,6 @@ class CreateNewPost(APIView):
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response({"detail": "Incorrect content-type"}, status=status.HTTP_400_BAD_REQUEST)
-
-
-# class UserLoginApiView(ObtainAuthToken):
-#     """ Handle creating user authentication token """
-#     renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
-
-
-# class UserCreateApiView(generics.CreateAPIView):
-#     """ Creates the user. """
-#     queryset = User.objects.all()
-#     permission_classes = (AllowAny,)
-#     serializer_class = RegisterSerializer
-
-
-# class UserCreateApiView(APIView):
-#
-#     def get(self, request):
-#         return Response()
-#
-#     def post(self, request, format=None):
-#         """ Check and save new user """
-#
-#         serializer = RegisterSerializer(data=request.data, context={'request': request})
-#         if serializer.is_valid():
-#             user = serializer.save()
-#             if user:
-#                 token = Token.objects.create(user=user)
-#                 json = serializer.data
-#                 json['token'] = token.key
-#                 return Response(json, status=status.HTTP_201_CREATED)
-#             return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserCreateApiView(APIView):
@@ -539,7 +472,7 @@ class ChangePassword(APIView):
         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        # TODO: blacklist and generate new JWT token
+        # TODO: blacklist and generate new JWT token ?delete token on client side?
         return Response(status=status.HTTP_200_OK)
 
 
