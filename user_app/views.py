@@ -23,7 +23,6 @@ from .tokens import account_activation_token
 
 def signup_view(request):
     if request.method == 'POST':
-        print(request.POST)
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)

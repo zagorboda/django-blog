@@ -21,7 +21,7 @@ class EmptyBlogMainPageTest(TestCase):
     def test_empty_main_page(self):
         """ Get method without posts """
         client = Client()
-        response = client.get(reverse('blog_main_page'))
+        response = client.get(reverse('api:blog_main_page'))
 
         posts = Post.objects.all()
         serializer = PostListSerializer(posts, many=True, context={'request': None})
@@ -66,7 +66,7 @@ class GetAllPostsTest(TestCase):
     def test_get_posts(self):
         """ Get all active posts from main page """
         client = Client()
-        response = client.get(reverse('blog_main_page'))
+        response = client.get(reverse('api:blog_main_page'))
 
         # Url for post-detail and author stores in database as /api/blog/slug/, but client.get makes request to
         # test server, so it return absolute url http://testserver/api/blog/slug/. Following code trunc urls.
@@ -111,7 +111,7 @@ class GetAllPostsOverPaginationTest(TestCase):
         result = []
 
         client = Client()
-        response = client.get(reverse('blog_main_page'))
+        response = client.get(reverse('api:blog_main_page'))
 
         truncated_urls = []
         for item in response.data['results']:
@@ -149,7 +149,7 @@ class MainPagePostRequestTest(TestCase):
     def test_post_request(self):
         """ Testing not allowed POST method """
         client = Client()
-        response = client.post(reverse('blog_main_page'))
+        response = client.post(reverse('api:blog_main_page'))
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
@@ -169,7 +169,7 @@ class PostDetailTest(TestCase):
         cls.user1.save()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({'username': cls.user1.username, 'password': cls.password1}),
             content_type='application/json'
         )
@@ -184,7 +184,7 @@ class PostDetailTest(TestCase):
         cls.test_user.save()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({'username': cls.test_user.username, 'password': cls.test_password}),
             content_type='application/json'
         )
@@ -227,7 +227,7 @@ class PostDetailTest(TestCase):
         """ Get detail for existing active post by unauthorized user (different edit_url) """
         client = Client()
         response = client.get(
-            reverse('post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             # HTTP_AUTHORIZATION='Token {}'.format(self.token1)
         )
 
@@ -236,7 +236,7 @@ class PostDetailTest(TestCase):
         # factory.credentials(HTTP_AUTHORIZATION='Token {}'.format(self.token1))
 
         request = factory.get(
-            reverse('post-detail', kwargs={'slug': 'slug'})
+            reverse('api:post-detail', kwargs={'slug': 'slug'})
         )
         test_request = Request(request)
 
@@ -254,21 +254,21 @@ class PostDetailTest(TestCase):
     def test_get_invalid_post_detail(self):
         """ Get detail for not existing post """
         client = Client()
-        response = client.get(reverse('post-detail', kwargs={'slug': 'slug1'}))
+        response = client.get(reverse('api:post-detail', kwargs={'slug': 'slug1'}))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_get_draft_post_detail(self):
         """ Get detail for existing draft(not active) post """
         client = Client()
-        response = client.get(reverse('post-detail', kwargs={'slug': 'draft-slug'}))
+        response = client.get(reverse('api:post-detail', kwargs={'slug': 'draft-slug'}))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_post_request_post_detail(self):
         """ Make POST request (create new comment) to post detail page by unauthorized user"""
         client = Client()
-        response = client.post(reverse('post-detail', kwargs={'slug': 'slug'}))
+        response = client.post(reverse('api:post-detail', kwargs={'slug': 'slug'}))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -280,7 +280,7 @@ class PostDetailTest(TestCase):
         # token = Token.objects.create(user=self.test_user)
 
         response = client.post(
-            reverse('post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.test_auth_token),
             data=json.dumps({'body': "test"}),
             content_type='application/json'
@@ -305,7 +305,7 @@ class PostDetailTest(TestCase):
         # token = Token.objects.create(user=self.test_user)
 
         response = client.post(
-            reverse('post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.test_auth_token),
             data=json.dumps({}),
             content_type='application/json'
@@ -319,11 +319,11 @@ class PostDetailTest(TestCase):
             post=self.post_with_single_comment,
             author=self.test_user,
             body='Some new comment',
-            active=True
+            status=1
         )
 
         client = Client()
-        response = client.get(reverse('post-detail', kwargs={'slug': 'single-comment-slug'}))
+        response = client.get(reverse('api:post-detail', kwargs={'slug': 'single-comment-slug'}))
 
         # response.data['url'] = response.data['url'][17:]
         # response.data['edit_url'] = response.data['edit_url'][17:]
@@ -334,7 +334,7 @@ class PostDetailTest(TestCase):
         factory = RequestFactory()
 
         request = factory.get(
-            reverse('post-detail', kwargs={'slug': 'single-comment-slug'})
+            reverse('api:post-detail', kwargs={'slug': 'single-comment-slug'})
         )
         test_request = Request(request)
 
@@ -355,14 +355,14 @@ class PostDetailTest(TestCase):
                 post=self.post_with_several_comments,
                 author=self.test_user,
                 body='Some new comment {}'.format(i),
-                active=i % 2
+                status=i % 2
             )
 
         client = Client()
-        response = client.get(reverse('post-detail', kwargs={'slug': 'several-comments-slug'}))
+        response = client.get(reverse('api:post-detail', kwargs={'slug': 'several-comments-slug'}))
 
         response.data['url'] = response.data['url'][17:]
-        # response.data['edit_url'] = response.data['edit_url'][17:]
+        response.data['report_url'] = response.data['report_url'][17:]
         response.data['author'] = response.data['author'][17:]
         response.data['like_url'] = response.data['like_url'][17:]
 
@@ -401,7 +401,7 @@ class UserDetailTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({'username': cls.user.username, 'password': cls.password}),
             content_type='application/json'
         )
@@ -411,11 +411,11 @@ class UserDetailTest(TestCase):
     def test_get_existing_user_detail(self):
         """ Get detail for existing user without posts and comments"""
         client = Client()
-        response = client.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        response = client.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
 
         # view = UserDetail.as_view()
 
-        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
         # response = view(request, username='test_user')
 
         test_request = Request(request)
@@ -432,13 +432,13 @@ class UserDetailTest(TestCase):
     def test_get_not_existing_user_detail(self):
         """ Get detail for not existing user"""
         client = Client()
-        response = client.get(reverse('user-detail', kwargs={'username': 'not_existing_user'}))
+        response = client.get(reverse('api:user-detail', kwargs={'username': 'not_existing_user'}))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_post_request_to_user_detail(self):
         client = Client()
-        response = client.post(reverse('user-detail', kwargs={'username': 'not_existing_user'}))
+        response = client.post(reverse('api:user-detail', kwargs={'username': 'not_existing_user'}))
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
@@ -460,9 +460,9 @@ class UserDetailTest(TestCase):
         )
 
         client = Client()
-        response = client.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        response = client.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
 
-        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
 
         test_request = Request(request)
         # test_request.user = self.user
@@ -495,9 +495,9 @@ class UserDetailTest(TestCase):
         )
 
         client = Client()
-        response = client.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        response = client.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
 
-        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
 
         test_request = Request(request)
 
@@ -524,14 +524,14 @@ class UserDetailTest(TestCase):
             body="test comment",
             post=test_post,
             author=self.user,
-            active=1
+            status=1
         )
 
         Comment.objects.create(
             body="test comment",
             post=test_post,
             author=self.user,
-            active=0
+            status=0
         )
 
         client = Client()
@@ -539,11 +539,11 @@ class UserDetailTest(TestCase):
         # token = Token.objects.create(user=self.user)
 
         response = client.get(
-            reverse('user-detail', kwargs={'username': 'test_user'}),
+            reverse('api:user-detail', kwargs={'username': 'test_user'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token)
         )
 
-        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
 
         test_request = Request(request)
         test_request.user = self.user
@@ -571,15 +571,15 @@ class UserDetailTest(TestCase):
             body="test comment",
             post=test_post,
             author=self.user,
-            active=1
+            status=1
         )
 
         client = Client()
         response = client.get(
-            reverse('user-detail', kwargs={'username': 'test_user'})
+            reverse('api:user-detail', kwargs={'username': 'test_user'})
         )
 
-        request = self.factory.get(reverse('user-detail', kwargs={'username': 'test_user'}))
+        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
         test_request = Request(request)
 
         User = get_user_model()
@@ -607,7 +607,7 @@ class CreateNewPost(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({'username': cls.user.username, 'password': cls.password}),
             content_type='application/json'
         )
@@ -621,7 +621,7 @@ class CreateNewPost(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('new-post'),
+            reverse('api:new-post'),
             data=json.dumps({}),
             content_type='multipart/form-data'
         )
@@ -635,7 +635,7 @@ class CreateNewPost(TestCase):
         client.login(username=self.user.username, password=self.password)
 
         response = client.post(
-            reverse('new-post'),
+            reverse('api:new-post'),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({}),
             content_type='multipart/form-data'
@@ -650,7 +650,7 @@ class CreateNewPost(TestCase):
         client.login(username=self.user.username, password=self.password)
 
         response = client.post(
-            reverse('new-post'),
+            reverse('api:new-post'),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
             content_type='multipart/form-data'
@@ -665,7 +665,7 @@ class CreateNewPost(TestCase):
         client.login(username=self.user.username, password=self.password)
         header = {'content-type': 'multipart/form-data'}
         response = client.post(
-            reverse('new-post'),
+            reverse('api:new-post'),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content",
                              "some_extra_field": "test value", "status": 1}),
@@ -693,7 +693,7 @@ class UserLoginApiTest(TestCase):
     def test_not_allowed_request(self):
         """ Make GET request (ObtainAuthToken process only POST request) """
         client = Client()
-        response = client.get(reverse('token_obtain_pair'))
+        response = client.get(reverse('api:token_obtain_pair'))
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
@@ -702,7 +702,7 @@ class UserLoginApiTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({"username": "not_existing_username", "password": "some_password"}),
             content_type='application/json'
         )
@@ -714,7 +714,7 @@ class UserLoginApiTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({"username": self.user.username, "password": "invalid_password"}),
             content_type='application/json'
         )
@@ -726,7 +726,7 @@ class UserLoginApiTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({"username": self.user.username, "password": self.password}),
             content_type='application/json'
         )
@@ -738,7 +738,7 @@ class UserCreateApiTest(TestCase):
     def test_get_request(self):
         """ Make GET request """
         client = Client()
-        response = client.get(reverse('signup'))
+        response = client.get(reverse('api:signup'))
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
@@ -747,7 +747,7 @@ class UserCreateApiTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('signup'),
+            reverse('api:signup'),
             data=json.dumps({"username": "!@#$%^&*()_+-=", "password": "test_password"}),
             content_type='application/json'
         )
@@ -759,8 +759,10 @@ class UserCreateApiTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('signup'),
-            data=json.dumps({"username": "valid_username", "password": "valid_password"}),
+            reverse('api:signup'),
+            data=json.dumps(
+                {"username": "valid_username", "password": "valid_password", "email": "valid_email@test.com"}
+            ),
             content_type='application/json'
         )
 
@@ -778,7 +780,7 @@ class UserCreateApiTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('signup'),
+            reverse('api:signup'),
             data=json.dumps({"username": "test_user", "password": "some_Valid_Safe_password_2345dsS-dsaD"}),
             content_type='application/json'
         )
@@ -790,7 +792,7 @@ class UserCreateApiTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('signup'),
+            reverse('api:signup'),
             data=json.dumps({"username": "test_user", "password": "12345678"}),
             content_type='application/json'
         )
@@ -812,7 +814,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({'username': cls.user.username, 'password': cls.password}),
             content_type='application/json'
         )
@@ -834,7 +836,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:edit-post', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
             content_type='application/json'
@@ -852,7 +854,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:edit-post', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": self.test_post.content}),
             content_type='application/json'
@@ -870,7 +872,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:edit-post', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"content": "Test content", "title": self.test_post.title}),
             content_type='application/json'
@@ -888,7 +890,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.get(
-            reverse('edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:edit-post', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
 
@@ -903,7 +905,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:edit-post', kwargs={'slug': 'slug'}),
             data=json.dumps({"content": "Test content", "title": self.test_post.title}),
             content_type='application/json'
         )
@@ -929,7 +931,7 @@ class EditPostTest(TestCase):
         another_user.save()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({'username': another_user.username, 'password': password}),
             content_type='application/json'
         )
@@ -937,7 +939,7 @@ class EditPostTest(TestCase):
         another_auth_token = response.data['access']
 
         response = client.get(
-            reverse('edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:edit-post', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(another_auth_token),
         )
 
@@ -951,7 +953,7 @@ class SearchPostTest(TestCase):
         """ Make search request without any post created """
         client = Client()
         response = client.get(
-            '{}{}'.format(reverse('blog_main_page'), '?search=some_test_search')
+            '{}{}'.format(reverse('api:blog_main_page'), '?search=some_test_search')
         )
 
         self.assertEqual(response.data['results'], [])
@@ -972,7 +974,7 @@ class SearchPostTest(TestCase):
         )
         client = Client()
         response = client.get(
-            '{}{}'.format(reverse('blog_main_page'), '?search=not_matching_pattern')
+            '{}{}'.format(reverse('api:blog_main_page'), '?search=not_matching_pattern')
         )
 
         self.assertEqual(response.data['results'], [])
@@ -993,7 +995,7 @@ class SearchPostTest(TestCase):
         )
         client = Client()
         response = client.get(
-            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+            '{}{}'.format(reverse('api:blog_main_page'), '?search=title')
         )
 
         response.data['results'][0]['url'] = response.data['results'][0]['url'][17:]
@@ -1027,7 +1029,7 @@ class SearchPostTest(TestCase):
         )
         client = Client()
         response = client.get(
-            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+            '{}{}'.format(reverse('api:blog_main_page'), '?search=title')
         )
 
         response.data['results'][0]['url'] = response.data['results'][0]['url'][17:]
@@ -1061,7 +1063,7 @@ class SearchPostTest(TestCase):
         )
         client = Client()
         response = client.get(
-            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+            '{}{}'.format(reverse('api:blog_main_page'), '?search=title')
         )
 
         for i in range(len(response.data['results'])):
@@ -1091,7 +1093,7 @@ class SearchPostTest(TestCase):
 
         client = Client()
         response = client.get(
-            '{}{}'.format(reverse('blog_main_page'), '?search=title')
+            '{}{}'.format(reverse('api:blog_main_page'), '?search=title')
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -1136,7 +1138,7 @@ class PostLikesTest(TestCase):
         client = Client()
 
         response = client.post(
-            reverse('token_obtain_pair'),
+            reverse('api:token_obtain_pair'),
             data=json.dumps({'username': cls.user.username, 'password': cls.password}),
             content_type='application/json'
         )
@@ -1157,13 +1159,13 @@ class PostLikesTest(TestCase):
 
     def test_no_likes(self):
         response = self.client.get(
-            reverse('post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
         )
         self.assertEqual(response.data['total_likes'], 0)
 
     def test_like_url_with_invalid_slug(self):
         response = self.client.get(
-            reverse('post-like', kwargs={'slug': 'invalid_slug'}),
+            reverse('api:post-like', kwargs={'slug': 'invalid_slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
 
@@ -1172,14 +1174,14 @@ class PostLikesTest(TestCase):
     def test_like_url_with_unauthorised_user(self):
         client = Client()
         response = client.get(
-            reverse('post-like', kwargs={'slug': 'slug'}),
+            reverse('api:post-like', kwargs={'slug': 'slug'}),
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_like_url_with_authorised_user(self):
         response = self.client.get(
-            reverse('post-like', kwargs={'slug': 'slug'}),
+            reverse('api:post-like', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
 
@@ -1187,13 +1189,13 @@ class PostLikesTest(TestCase):
         self.assertEqual(post.likes.count(), 1)
         self.assertEqual(response.data, {'updated': True, 'liked': True})
         response = self.client.get(
-            reverse('post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
         )
         self.assertEqual(response.data['total_likes'], 1)
 
     def test_like_url_with_several_get_request(self):
         response = self.client.get(  # First request
-            reverse('post-like', kwargs={'slug': 'slug'}),
+            reverse('api:post-like', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
         self.assertEqual(response.data, {'updated': True, 'liked': True})
@@ -1202,12 +1204,12 @@ class PostLikesTest(TestCase):
         self.assertEqual(post.likes.count(), 1)
 
         response = self.client.get(
-            reverse('post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
         )
         self.assertEqual(response.data['total_likes'], 1)
 
         response = self.client.get(  # Second request
-            reverse('post-like', kwargs={'slug': 'slug'}),
+            reverse('api:post-like', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
         self.assertEqual(response.data, {'updated': True, 'liked': False})
@@ -1216,6 +1218,6 @@ class PostLikesTest(TestCase):
         self.assertEqual(post.likes.count(), 0)
 
         response = self.client.get(
-            reverse('post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
         )
         self.assertEqual(response.data['total_likes'], 0)

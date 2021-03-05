@@ -1,0 +1,4 @@
+{% block content %}
+Hi {{ user.username }},
+Please click on the link to confirm your registration,http://{{ domain }}{% url 'api:confirm_email' uidb64=uid token=token %}
+{% endblock %}
