@@ -24,7 +24,6 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'django_extensions',
-    'rest_framework.authtoken',
     'whitenoise.runserver_nostatic',
     'hitcount',
     'rest_framework_swagger',
@@ -127,7 +126,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,
+    # 'PAGE_SIZE': 10,
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
     # 'DEFAULT_RENDERER_CLASSES': [
     #     'rest_framework.renderers.JSONRenderer',

@@ -20,9 +20,13 @@
         <p>{{user_profile.bio | linebreaks}}</p>
     </div>
 
-    <div>
 
+    {% if is_owner %}
+    <div class="container">
+        <p><a href="{% url 'user_app:edit_profile' %}">Edit profile</a></p>
+        <p><a href="{% url 'user_app:password_change' %}">Change password</a></p>
     </div>
+    {% endif %}
 
         {% if posts_list %}
             <hr>

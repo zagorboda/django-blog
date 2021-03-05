@@ -35,3 +35,13 @@ class AuthenticationForm(forms.ModelForm):
             if not authenticate(username=username, password=password):
                 raise forms.ValidationError("Invalid login")
 
+
+class EditProfileForm(forms.Form):
+    bio = forms.CharField(widget=forms.Textarea, required=False)
+
+    def clean_bio(self):
+        bio = self.cleaned_data.get('bio')
+        bio_len = len(bio)
+        if bio_len > 500:
+            raise forms.ValidationError("Max length for bio is 500 chars. Current len is {} chars".format(bio_len))
+        return bio

@@ -4,6 +4,7 @@
 # from django.views.generic.detail import DetailView
 # from django.contrib.auth.models import User
 # from django.views import generic
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout, get_user_model, authenticate, login
 from django.contrib.sites.shortcuts import get_current_site
 from django.contrib import messages
@@ -16,7 +17,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.template.loader import render_to_string
 
 from blog_app.models import Post, Comment
-from .forms import SignUpForm, AuthenticationForm
+from .forms import SignUpForm, AuthenticationForm, EditProfileForm
 from .tokens import account_activation_token
 
 
@@ -106,9 +107,8 @@ def user_detail_view(request, name):
         # context['error'] = 'User not found'
 
 
-def activate(request, uidb64, token):
+def confirm_email_view(request, uidb64, token):
     User = get_user_model()
-    print('here')
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
@@ -117,8 +117,6 @@ def activate(request, uidb64, token):
     if user is not None and account_activation_token.check_token(user, token):
         user.is_active = True
         user.save()
-        login(request, user)
-        # return redirect('home')
         messages.add_message(request, messages.INFO, 'Thank you for your email confirmation. Now you can login your account.')
         return HttpResponseRedirect(reverse('user_app:login'))
     else:
@@ -126,3 +124,28 @@ def activate(request, uidb64, token):
         return HttpResponseRedirect(reverse('user_app:login'))
 
 
+@login_required
+def edit_profile_view(request):
+    user = request.user
+    if request.method == 'POST':
+        print(request)
+        print(request.POST)
+        form = EditProfileForm(request.POST)
+
+        if form.is_valid():
+            user.bio = form.cleaned_data['bio']
+            user.save()
+
+            return HttpResponseRedirect(reverse('user_app:profile', kwargs={'name': user.username}))
+    else:
+        initial_dict = {
+            'bio': user.bio
+        }
+
+        form = EditProfileForm(initial=initial_dict)
+
+    context = {
+        'form': form,
+    }
+
+    return render(request, 'user_app/edit_profile.html', context)
