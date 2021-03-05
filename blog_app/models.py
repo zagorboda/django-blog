@@ -26,7 +26,7 @@ class Post(models.Model, HitCountMixin):
     updated_on = models.DateTimeField(auto_now=True)
     content = models.TextField()
     created_on = models.DateTimeField(auto_now_add=True)
-    status = models.IntegerField(choices=STATUS, default=0)
+    status = models.IntegerField(choices=STATUS, default=1)
 
     hit_count_generic = GenericRelation(HitCount, object_id_field='object_pk',
                                         related_query_name='hit_count_generic_relation')
@@ -59,7 +59,7 @@ class Comment(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='comment_author', on_delete=models.CASCADE, default='')
     body = models.TextField()
     created_on = models.DateTimeField(auto_now_add=True)
-    active = models.BooleanField(default=False)
+    status = models.IntegerField(choices=STATUS, default=1)
 
     class Meta:
         ordering = ['created_on']
@@ -71,6 +71,15 @@ class Comment(models.Model):
 class ReportPost(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='report_post')
     reports = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='post_reports', default=0)
+    total_reports = models.IntegerField(default=0)
+
+    def get_number_of_reports(self):
+        return self.reports.count()
+
+
+class ReportComment(models.Model):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='report_comment')
+    reports = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='comment_reports')
     total_reports = models.IntegerField(default=0)
 
     def get_number_of_reports(self):

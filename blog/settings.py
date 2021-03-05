@@ -26,7 +26,6 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'django_extensions',
-    'rest_framework.authtoken',
     'whitenoise.runserver_nostatic',
     'hitcount',
     'rest_framework_swagger',
@@ -123,6 +122,8 @@ LOGIN_URL = 'user_app:login'
 LOGIN_REDIRECT_URL = 'blog_app:home'
 LOGOUT_REDIRECT_URL = 'blog_app:home'
 
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+
 # AUTH_PROFILE_MODULE = ""
 
 REST_FRAMEWORK = {
@@ -130,8 +131,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-
-    'PAGE_SIZE': 10,
+    # 'PAGE_SIZE': 10,
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
     # 'DEFAULT_RENDERER_CLASSES': [
     #     'rest_framework.renderers.JSONRenderer',
@@ -161,6 +161,18 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles/')
 CORS_ORIGIN_ALLOW_ALL = True
 # CORS_ORIGIN_WHITELIST = ('localhost:3000',)
 
+# MAIL_GUN_API_LINK = env('MAIL_GUN_API_LINK')
+# MAIL_GUN_API_TOKEN = env('MAIL_GUN_API_TOKEN')
+# MAIL_GUN_EMAIL = env('MAIL_GUN_EMAIL')
+#
+# EMAIL_HOST = env("EMAIL_HOST")
+# EMAIL_PORT = env("EMAIL_PORT")
+# EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+# EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+# DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
+#
+# EMAIL_USE_TLS = True
+
 if not DEBUG:
     # Simplified static file serving.
     # https://warehouse.python.org/project/whitenoise/
@@ -183,9 +195,12 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
     X_FRAME_OPTIONS = 'DENY'
 
-    WHITENOISE_USE_FINDERS = True
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 else:
     SECURE_SSL_REDIRECT = False
+
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    # EMAIL_FILE_PATH = str(BASE_DIR.join('sent_emails'))
 
 LOGGING = {
     'version': 1,
@@ -228,7 +243,7 @@ LOGGING = {
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
