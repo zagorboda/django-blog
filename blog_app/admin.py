@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 
-from .models import Post, Comment, ReportPost, Tag
+from .models import Post, Comment, ReportPost, Tag, ReportComment
 
 
 class PostAdmin(admin.ModelAdmin):
@@ -34,7 +34,7 @@ class PostAdmin(admin.ModelAdmin):
 
 class CommentAdmin(admin.ModelAdmin):
     list_display = ('author', 'short_description', 'post_link', 'created_on')
-    list_filter = ('active', 'created_on')
+    list_filter = ('status', 'created_on')
     list_display_links = ('author',)
     readonly_fields = ('post_link',)
     search_fields = ('body', 'post__title', 'author__username')
@@ -53,9 +53,10 @@ class CommentAdmin(admin.ModelAdmin):
         return obj.body[:100]
 
 
-class ReportAdmin(admin.ModelAdmin):
-    list_display = ('post', 'total_reports', 'post_link')
-    readonly_fields = ('total_reports',)
+class ReportPostAdmin(admin.ModelAdmin):
+    list_display = ('post', 'total_reports',)
+    readonly_fields = ('total_reports', 'post_link')
+    exclude = ('reports', 'post')
 
     def total_reports(self, obj):
         return obj.get_number_of_reports()
@@ -69,6 +70,39 @@ class ReportAdmin(admin.ModelAdmin):
     post_link.short_description = 'Admin post url'
 
 
+class ReportCommentAdmin(admin.ModelAdmin):
+    list_display = ('get_short_comment', 'total_reports',)
+    readonly_fields = ('total_reports', 'get_comment', 'comment_link', 'post_link')
+    search_fields = ('comment__body', 'comment__post__content')
+    exclude = ('reports', 'comment')
+
+    def get_short_comment(self, obj):
+        return obj.comment.body[:100]
+
+    def total_reports(self, obj):
+        return obj.get_number_of_reports()
+
+    total_reports.admin_order_field = 'total_reports'
+
+    def post_link(self, obj):
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse('admin:%s_%s_change' % (obj._meta.app_label, obj.comment.post._meta.model_name), args=[obj.comment.post.id]),
+            obj.comment.post.title[:100])
+        )
+    post_link.short_description = 'Post url (admin)'
+
+    def comment_link(self, obj):
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse('admin:%s_%s_change' % (obj._meta.app_label, obj.comment._meta.model_name), args=[obj.comment.id]),
+            obj.comment.body[:100])
+        )
+    comment_link.short_description = 'Comment url (admin)'
+
+    def get_comment(self, obj):
+        return obj.comment.body
+    get_comment.short_description = 'Comment body'
+
+
 class TagAdmin(admin.ModelAdmin):
     list_display = ('tagline',)
     search_fields = ('tagline',)
@@ -76,5 +110,6 @@ class TagAdmin(admin.ModelAdmin):
 
 admin.site.register(Post, PostAdmin)
 admin.site.register(Comment, CommentAdmin)
-admin.site.register(ReportPost, ReportAdmin)
+admin.site.register(ReportPost, ReportPostAdmin)
+admin.site.register(ReportComment, ReportCommentAdmin)
 admin.site.register(Tag, TagAdmin)

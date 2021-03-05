@@ -16,7 +16,7 @@ from hitcount.views import HitCountDetailView
 # from django.contrib.postgres.search import SearchVector  # Search
 
 from .forms import NewPostForm, CommentForm
-from .models import Post, ReportPost, Tag
+from .models import Post, ReportPost, Tag, Comment, ReportComment
 
 from datetime import datetime
 
@@ -34,7 +34,7 @@ class BlogPostCounterMixin(object):
 
 class PostList(generic.ListView):
     """ Show list of most recent posts """
-    paginate_by = 10
+    paginate_by = 15
     queryset = Post.objects.filter(status=1).order_by('-created_on')
     template_name = 'blog_app/index.html'
 
@@ -44,10 +44,20 @@ def search(request):
         if 'q' in request.GET and request.GET.get('q'):
             page = request.GET.get('page', 1)
 
-            query = request.GET.get('q')
-            posts = Post.objects.filter(
-                Q(title__icontains=query) | Q(tags__tagline__icontains=query), status=1
-            ).distinct().order_by('-created_on')
+            query_list = request.GET.getlist('q')
+            a = [key for key in request.GET]
+            print(a)
+            print(query_list)
+            qs = [Q(title__icontains=keyword) | Q(tags__tagline__icontains=keyword) for keyword in query_list]
+            print(qs)
+            query = qs.pop()  # get the first element
+
+            for q in qs:
+                query |= q
+            posts = Post.objects.filter(query, status=1)
+            # posts = Post.objects.filter(
+            #     Q(title__icontains=query) | Q(tags__tagline__icontains=query), status=1
+            # ).distinct().order_by('-created_on')
             # posts = Post.objects.filter(
             #     title__icontains=query, tags__tagline__icontains=query, status=1
             # ).order_by('-created_on')
@@ -58,7 +68,7 @@ def search(request):
             posts = paginator.page(page)
 
             return render(request, 'blog_app/search.html',
-                          {'post_list': posts, 'query': query})
+                          {'post_list': posts, 'query': '&q='.join(query_list)})
         return render(request, 'blog_app/search.html')
 
 
@@ -157,6 +167,31 @@ class PostReportToggle(RedirectView):
         return url_
 
 
+class CommentReportToggle(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        id = self.kwargs.get("id")
+        comment = Comment.objects.get(id=id)
+
+        slug = self.kwargs.get("slug")
+        post = Post.objects.get(slug=slug)
+        url_ = post.get_absolute_url()
+
+        user = self.request.user
+        if user.is_authenticated:
+            if ReportComment.objects.filter(comment=comment).exists():
+                report = ReportComment.objects.get(comment=comment)
+                if not report.reports.filter(username=user.username).exists():
+                    report.total_reports += 1
+                    report.reports.add(user)
+                    report.save()
+            else:
+                report = ReportComment.objects.create(comment=comment)
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+        return url_
+
+
 class PostDetail(HitCountDetailView):
     """ Show single post """
     model = Post
@@ -191,6 +226,7 @@ class PostDetail(HitCountDetailView):
             # Assign the current post to the comment
             new_comment.post = self.object
             new_comment.author = self.request.user
+            new_comment.active = True
             # Save the comment to the database
             new_comment.save()
         return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': kwargs['slug']}))
@@ -199,7 +235,7 @@ class PostDetail(HitCountDetailView):
     #     context = super(PostDetail, self).get_context_data(**kwargs)
     #     blog_post_slug = self.kwargs['slug']
     #     if blog_post_slug not in self.request.session:
-    #         # bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
+    #         # bp = Post.objects.filter(slug=btoken log_post_slug).update(total_views=+1)
     #         # Insert the slug into the session as the user has seen it
     #         self.request.session[blog_post_slug] = blog_post_slug
     #     return context
@@ -229,8 +265,6 @@ def create_new_post(request):
             new_post.content = form.cleaned_data['content']
             new_post.author = request.user
             new_post.created_on = datetime.now()
-            # new_post.updated_on = datetime.now()
-            new_post.status = 0
 
             new_post.image = form.cleaned_data['image']
 
