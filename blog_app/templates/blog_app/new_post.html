@@ -1,4 +1,6 @@
 {% extends 'layouts/base.html' %}
+{% load static %}
+
 
 {% block content %}
 
@@ -10,6 +12,7 @@
 
   <form action="" method="post" enctype="multipart/form-data">
     {% csrf_token %}
+    {{ form.media }}
     {{ form.as_p }}
     <p>Tags are determined by #</p>
     <p>Examples: #sport #tech #regular life</p>

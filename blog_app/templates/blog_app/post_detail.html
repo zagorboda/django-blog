@@ -41,7 +41,7 @@
 
             {% endif %}
 
-            <p align="justify">{{ post.content | linebreaks }}</p>
+            {{ post.content | safe }}
         </div>
     </div>
 

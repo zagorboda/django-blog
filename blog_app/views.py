@@ -244,7 +244,9 @@ class PostDetail(HitCountDetailView):
 def create_new_post(request):
     """ Create form to add new post """
     if request.method == 'POST':
-        print('Files = ', request.FILES)
+        print('Files - ', request.FILES)
+        print('Req - ', request)
+        print('POST data - ', request.POST)
         form = NewPostForm(request.POST, request.FILES)
         if form.is_valid():
             new_post = Post()

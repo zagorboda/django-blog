@@ -29,6 +29,9 @@ INSTALLED_APPS = [
     'hitcount',
     'rest_framework_swagger',
     'corsheaders',
+    'tinymce',
+    'django_summernote',
+    'ckeditor',
 
     'django.contrib.admin',
     'django.contrib.auth',
@@ -141,6 +144,8 @@ AUTH_USER_MODEL = 'user_app.User'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+CKEDITOR_UPLOAD_PATH = "uploads/"
+# CKEDITOR_UPLOAD_PATH = os.path.join(os.path.join(BASE_DIR, MEDIA_URL), 'ckeditor/')
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
