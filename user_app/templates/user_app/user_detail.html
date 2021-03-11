@@ -3,7 +3,7 @@
 
 {% block title %}
     {% if not error %}
-        {{user.username}}
+        {{user_profile.username}}
     {% else %}
         User not found
     {% endif %}
@@ -28,42 +28,193 @@
     </div>
     {% endif %}
 
-        {% if posts_list %}
-            <hr>
-            <div class="container">
-                <h4>User posts</h4>
-            {% for post in posts_list %}
-                <div class="row">
-                    <h4><a href="{% url 'blog_app:post_detail' post.slug %}">{{post.title}}</a></h4>
-                    <p class="text-muted" style="width:100%;">{{ post.created_on}}</p>
-                    <p>{{post.content|slice:":200" }}</p>
-                </div>
-            {% endfor %}
+    <div class="container">
+        <div class="tab-wrapper">
 
-            </div>
+                <div class="tab">
+                    {% if tab == 'post' %}
+                        <input type="radio" name="tab" id="tab1" checked>
+                    {% else %}
+                        <input type="radio" name="tab" id="tab1">
+                    {% endif %}
+                    <label for="tab1"><i class="fa fa-th"></i> User posts</label>
+                    <div class="tab-content">
+                    {% if comment_list %}
+                        {% for post in post_list %}
+                            <div class="row">
+                                <h4><a href="{% url 'blog_app:post_detail' post.slug %}">{{post.title}}</a></h4>
+                                <p class="text-muted" style="width:100%;">{{ post.created_on}}</p>
+                                <p>{{post.content|slice:":200" }}</p>
+                            </div>
+                            <hr>
+                        {% endfor %}
+                    {% endif %}
 
-        {% endif %}
+                    {% if post_list.number %}
+                        <div class="container mb-5">
+                            <div class="pagination centered">
+                                <span class="step-links">
+                                    {% if post_list.has_previous %}
+                                        <a href="?post_page=1&comment_page={{comment_list.number}}&tab=post">&laquo; first</a>
+                                        <a href="?post_page={{ post_list.previous_page_number }}&comment_page={{comment_list.number}}&tab=post">previous</a>
+                                    {% endif %}
 
+                                    <span class="current">
+                                        Page {{ post_list.number }} of {{ post_list.paginator.num_pages }}.
+                                    </span>
 
-    {% if comment_list and is_owner %}
-        <hr>
-        <h4>Your comments</h4>
-        <div class="container">
-            {% for comment in comment_list %}
-                <div class="row">
-                    <a href="{% url 'blog_app:post_detail' comment.post.slug %}#{{comment.id}}">{{comment.post}}</a>
-<!--                    <span class="text-muted">| {% if comment.status %} Active {%else%} Waiting for moderating{%endif%}</span>-->
-                </div>
-                <div class="row">
-                    <p>{{comment.body}}</p>
-                </div>
-            <hr>
-            {% endfor %}
-        </div>
-    {% else %}
+                                    {% if post_list.has_next %}
+                                        <a href="?post_page={{ post_list.next_page_number }}&comment_page={{comment_list.number}}&tab=post">next</a>
+                                        <a href="?post_page={{ post_list.paginator.num_pages }}&comment_page={{comment_list.number}}&tab=post">last &raquo;</a>
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    </div><!-- tab-content -->
+                </div><!-- tab -->
+
+                <div class="tab">
+                    {% if tab == 'comment' %}
+                        <input type="radio" name="tab" id="tab2" checked>
+                    {% else %}
+                        <input type="radio" name="tab" id="tab2">
+                    {% endif %}
+                    <label for="tab2"> User comments</label>
+                    <div class="tab-content">
+                        {% if comment_list %}
+                            {% for comment in comment_list %}
+                                <div class="row">
+                                    <a href="{% url 'blog_app:post_detail' comment.post.slug %}#{{comment.id}}">{{comment.post}}</a>
+                                </div>
+                                <div class="row">
+                                    <p>{{comment.body|slice:":100"}}</p>
+                                </div>
+                            <hr>
+                            {% endfor %}
+                        {% endif %}
+
+                        {% if comment_list.number %}
+                            <div class="container mb-5">
+                                <div class="pagination centered">
+                                    <span class="step-links">
+                                        {% if comment_list.has_previous %}
+                                            <a href="?post_page={{post_list.number}}&comment_page=1&tab=comment">&laquo; first</a>
+                                            <a href="?post_page={{post_list.number}}&comment_page={{ comment_list.previous_page_number }}&tab=comment">previous</a>
+                                        {% endif %}
+
+                                        <span class="current">
+                                            Page {{ comment_list.number }} of {{ comment_list.paginator.num_pages }}.
+                                        </span>
+
+                                        {% if comment_list.has_next %}
+                                            <a href="?post_page={{post_list.number}}&comment_page={{ comment_list.next_page_number }}&tab=comment">next</a>
+                                            <a href="?post_page={{post_list.number}}&comment_page={{ comment_list.paginator.num_pages }}&tab=comment">last &raquo;</a>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                    </div><!-- tab-content -->
+                </div><!-- tab -->
+
+        </div><!-- tab wrapper-->
+    </div>
 
     {% endif %}
 
-    {% endif %}
+
+<style>
+.tab-wrapper{
+    position: relative;
+    width: 100%;
+    margin: 5% auto;
+
+    display: flex;
+    flex-wrap: nowrap;
+}
+
+.tab-content{
+    position: absolute;
+    left: 0;
+    margin-left: -1px;
+
+    text-align: left;
+    padding: 20px;
+    background: white;
+    opacity: 0;
+    display: none;
+
+    transition: all .5s linear;
+}
+
+.tab{
+    text-align: center;
+    margin: auto;
+}
+
+.tab label{
+    padding: 14px;
+    display: block;
+    background: #2a2e3e;
+    color: grey;
+    display: block;
+    margin-left: -1px;
+    text-transform: uppercase;
+    transition: all .5s linear;
+}
+
+.tab input[type='radio']{
+    display: none;
+}
+
+.tab label:hover {
+  cursor: pointer; /* make it look like a link */
+  background: white;
+}
+
+.tab input[type='radio']:checked ~ .tab-content{
+    opacity: 1;
+    display: block;
+}
+
+.tab input[type='radio']:checked ~label{
+    background: white;
+    color:black;
+}
+
+/*@media all and (max-width: 768px){
+
+    body{
+        font-size: 100%;
+    }
+
+    .tab-wrapper{
+        width: 90%;
+        display: block;
+    }
+
+    .tab-content{
+        max-height: 0;
+        position: relative;
+    }
+
+    .tab input[type='radio']:checked ~ .tab-content{
+        max-height: 100%;
+    }
+
+    .tab input[type='radio']:checked ~label{
+        border-bottom: 1px solid teal;
+    }
+
+    .copyright{
+        font-size:11px;
+    }
+
+}*/
+</style>
+
 
 {% endblock content %}

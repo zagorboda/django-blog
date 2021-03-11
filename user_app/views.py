@@ -9,6 +9,7 @@ from django.contrib.auth import logout, get_user_model, authenticate, login
 from django.contrib.sites.shortcuts import get_current_site
 from django.contrib import messages
 from django.core.mail import EmailMessage
+from django.core.paginator import Paginator
 from django.http import HttpResponse, Http404, HttpResponseRedirect
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -91,24 +92,46 @@ def logout_view(request):
 
 def user_detail_view(request, name):
     context = dict()
-    try:
-        User = get_user_model()
-        user = User.objects.get(username=name)
-        context['user_profile'] = user
-        posts_list = Post.objects.filter(author=user, status=1)
-        context['posts_list'] = posts_list
-        if request.user.id == user.id:
-            comment_list = Comment.objects.filter(author=user)
-            context['comment_list'] = comment_list
-            context['is_owner'] = True
-        return render(request, "user_app/user_detail.html", context)
-    except Exception as e:
-        raise Http404
-        # context['error'] = 'User not found'
+    User = get_user_model()
+
+    posts_list_page = request.GET.get('post_page', '1')
+    comment_list_page = request.GET.get('comment_page', '1')
+    tab = request.GET.get('tab', '1')
+    if tab != 'post' and tab != 'comment':
+        tab = 'post'
+
+    posts_list_page = int(posts_list_page) if posts_list_page.isdigit() else 1
+    comment_list_page = int(comment_list_page) if comment_list_page.isdigit() else 1
+
+    user = get_object_or_404(User, username=name)
+    context['user_profile'] = user
+
+    user_posts = Post.objects.filter(author=user, status=1)
+    paginator = Paginator(user_posts, 15)
+    if posts_list_page > paginator.num_pages:
+        post_list = paginator.page(paginator.num_pages)
+    if posts_list_page < 1:
+        post_list = paginator.page(1)
+    else:
+        post_list = paginator.page(posts_list_page)
+    context['post_list'] = post_list
+
+    user_comments = Comment.objects.filter(author=user, status=1)
+    paginator = Paginator(user_comments, 15)
+    comment_list = paginator.page(comment_list_page)
+    context['comment_list'] = comment_list
+
+    context['tab'] = tab
+
+    if request.user.id == user.id:
+        context['is_owner'] = True
+
+    return render(request, "user_app/user_detail.html", context)
 
 
 def confirm_email_view(request, uidb64, token):
     User = get_user_model()
+
     try:
         uid = force_text(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
