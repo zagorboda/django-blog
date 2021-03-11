@@ -267,8 +267,6 @@ def create_new_post(request):
             new_post.author = request.user
             new_post.created_on = datetime.now()
 
-            new_post.image = form.cleaned_data['image']
-
             new_post.save()
 
             # image_resize(), call method directly to not to use signals

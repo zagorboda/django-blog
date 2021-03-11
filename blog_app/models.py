@@ -6,7 +6,6 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.conf import settings
 # from django.utils.encoding import python_2_unicode_compatible
 
-from tinymce import models as tinymce_models
 from ckeditor.fields import RichTextField
 
 STATUS = (
@@ -27,9 +26,9 @@ class Post(models.Model, HitCountMixin):
     slug = models.SlugField(max_length=200, unique=True)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='posts', on_delete=models.CASCADE, default='')
     updated_on = models.DateTimeField(auto_now=True)
-    # content = models.TextField()
+    content = models.TextField()
     # content = tinymce_models.HTMLField(default=False)
-    content = RichTextField(config_name='awesome_ckeditor')
+    # content = RichTextField(config_name='awesome_ckeditor')
     created_on = models.DateTimeField(auto_now_add=True)
     status = models.IntegerField(choices=STATUS, default=1)
 
@@ -38,7 +37,7 @@ class Post(models.Model, HitCountMixin):
     likes = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='post_likes')
     tags = models.ManyToManyField(Tag, blank=True)
 
-    image = models.ImageField(upload_to='images/', blank=True)
+    # image = models.ImageField(upload_to='images/', blank=True)
 
     def get_absolute_url(self):
         return reverse("blog_app:post_detail", kwargs={"slug": self.slug})

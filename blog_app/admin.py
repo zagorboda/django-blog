@@ -2,14 +2,27 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 
+from django import forms
+
+from ckeditor.widgets import CKEditorWidget
+
 from .models import Post, Comment, ReportPost, Tag, ReportComment
 
 
+class PostAdminForm(forms.ModelForm):
+    content = forms.CharField(widget=CKEditorWidget())
+
+    class Meta:
+        model = Post
+        fields = '__all__'
+
+
 class PostAdmin(admin.ModelAdmin):
+    form = PostAdminForm
     list_display = ('title', 'author', 'slug', 'status', 'created_on', 'formatted_hit_count', 'formatted_likes')
     list_filter = ('status',)
-    readonly_fields = ('formatted_hit_count', 'formatted_likes')
-    search_fields = ('title', 'content', 'author__username', 'tags__tagline')
+    readonly_fields = ('formatted_hit_count', 'formatted_likes', 'author',)
+    search_fields = ('title', 'author__username', 'tags__tagline')
     prepopulated_fields = {'slug': ('title',)}
     # fields = ('title', )
     # fieldsets = None
