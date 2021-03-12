@@ -9,7 +9,7 @@ from django.contrib.auth import logout, get_user_model, authenticate, login
 from django.contrib.sites.shortcuts import get_current_site
 from django.contrib import messages
 from django.core.mail import EmailMessage
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import HttpResponse, Http404, HttpResponseRedirect
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -108,17 +108,22 @@ def user_detail_view(request, name):
 
     user_posts = Post.objects.filter(author=user, status=1)
     paginator = Paginator(user_posts, 15)
-    if posts_list_page > paginator.num_pages:
-        post_list = paginator.page(paginator.num_pages)
-    if posts_list_page < 1:
-        post_list = paginator.page(1)
-    else:
+    try:
         post_list = paginator.page(posts_list_page)
+    except PageNotAnInteger:
+        post_list = paginator.page(1)
+    except EmptyPage:
+        post_list = paginator.page(paginator.num_pages)
     context['post_list'] = post_list
 
     user_comments = Comment.objects.filter(author=user, status=1)
     paginator = Paginator(user_comments, 15)
-    comment_list = paginator.page(comment_list_page)
+    try:
+        comment_list = paginator.page(comment_list_page)
+    except PageNotAnInteger:
+        comment_list = paginator.page(1)
+    except EmptyPage:
+        comment_list = paginator.page(paginator.num_pages)
     context['comment_list'] = comment_list
 
     context['tab'] = tab
