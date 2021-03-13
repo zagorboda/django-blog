@@ -74,9 +74,6 @@ class CustomPagination(pagination.PageNumberPagination):
             response_data['create_new_post_url'] = self.request.build_absolute_uri(
                 reverse('api:new-post')
             )
-            response_data['change_password'] = self.request.build_absolute_uri(
-                reverse('api:change_password')
-            )
         else:
             response_data['reset_password'] = self.request.build_absolute_uri(
                 reverse('api:email_reset_password')
@@ -239,7 +236,7 @@ class UserDetail(generics.RetrieveAPIView):
     # queryset = User.objects.all()
     # serializer_class = UserSerializer
 
-    query_set_name = 'user_profile'
+    # query_set_name = 'user_profile'
 
     lookup_field = 'username'
 
@@ -251,7 +248,6 @@ class UserDetail(generics.RetrieveAPIView):
             raise Http404
 
         serializer = UserSerializer(queryset, context={'request': request})
-
         return Response(serializer.data)
 
 
@@ -347,8 +343,8 @@ class EditPost(APIView):
 class CreateNewPost(APIView):
     """ Create new post.
 
-    POST : usr must be logged in.
-    Requires : title, content, body.
+    POST : user must be logged in.
+    Requires : title, content(HTML markup).
     Additional fields: tags(list of items).
     """
     serializer_class = PostDetailSerializer
@@ -372,7 +368,7 @@ class CreateNewPost(APIView):
                 data = request.data.copy()
             else:
                 data = json.loads(request.body)
-
+            # TODO
             for field in required_fields:
                 if field not in data:
                     validation_errors[field] = ['This field may not be blank.']

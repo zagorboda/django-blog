@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model, password_validation
 from django.core import exceptions
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.validators import validate_email
 from django.utils.encoding import force_bytes, force_text
 from django.utils.http import urlsafe_base64_decode
@@ -68,20 +69,19 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     # tags = serializers.SerializerMethodField('get_tags')
     tags = TagSerializer(many=True, read_only=False, required=False)
-    image = serializers.ImageField(max_length=None, allow_empty_file=True, allow_null=True, required=False)
+    # image = serializers.ImageField(max_length=None, allow_empty_file=True, allow_null=True, required=False)
     # image_url = serializers.SerializerMethodField('get_image_url')
 
     class Meta:
         model = Post
         fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
-                  'created_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'image', 'tags',
-                  'comments')
+                  'created_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'tags', 'comments')
         extra_kwargs = {
             'tags': {'validators': []},
         }
 
     def get_active_comments(self, obj):
-        """ Return only active comments (active=True) """
+        """ Return only active comments (status=1) """
         posts = Comment.objects.all().filter(status=1, post=obj)
         serializer = CommentSerializer(posts, many=True, context={'request': self.context['request']})
         return serializer.data
@@ -113,12 +113,12 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         tag_list = [tag.tagline for tag in tags]
         return tag_list
 
-    def get_image_url(self, obj):
-        """ Return url to image """
-        if obj.image != '':
-            request = self.context.get("request")
-            return request.build_absolute_uri(obj.image.url)
-        return None
+    # def get_image_url(self, obj):
+    #     """ Return url to image """
+    #     if obj.image != '':
+    #         request = self.context.get("request")
+    #         return request.build_absolute_uri(obj.image.url)
+    #     return None
 
     # def update(self, instance, validated_data):
     #     print(validated_data)
@@ -195,26 +195,114 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='api:user-detail', lookup_field='username')
     # posts = serializers.HyperlinkedRelatedField(many=True, view_name='post-detail', read_only=True,
     #                                             lookup_field='slug')
-    posts = serializers.SerializerMethodField('get_user_posts')
-    comments = serializers.SerializerMethodField('get_comments')
+    posts = serializers.SerializerMethodField('get_user_posts', read_only=True)
+    comments = serializers.SerializerMethodField('get_comments', read_only=True)
 
     def get_user_posts(self, user):
         """ Return all user posts if owner makes request, for other users return only published posts """
+        url = self.context['request'].build_absolute_uri('?')
+
+        page_size = 15
+
+        current_post_page = self.context['request'].GET.get('post_page', '1')
+        current_post_page = int(current_post_page) if current_post_page.isdigit() else 1
+
+        current_comment_page = self.context['request'].GET.get('comment_page', '1')
+        current_comment_page = int(current_comment_page) if current_comment_page.isdigit() else 1
+
         if self.context['request'].user == user:
             posts = Post.objects.all().filter(author=user)
         else:
             posts = Post.objects.all().filter(author=user, status=1)
-        serializer = PostListSerializer(posts, many=True, context={'request': self.context['request']})
-        return serializer.data
+
+        paginator = Paginator(posts, page_size)
+
+        try:
+            paginated_posts = paginator.page(current_post_page)
+        except EmptyPage:
+            current_post_page = paginator.num_pages
+            paginated_posts = paginator.page(paginator.num_pages)
+
+        serializer = PostListSerializer(paginated_posts, many=True, context={'request': self.context['request']})
+        post_list = serializer.data
+
+        next_post_page_number = paginated_posts.next_page_number() if paginated_posts.has_next() else None
+        previous_post_page_number = paginated_posts.previous_page_number() if paginated_posts.has_previous() else None
+
+        if next_post_page_number:
+            next_post_page_url = '{}?post_page={}&comment_page={}'.format(
+                url, next_post_page_number, current_comment_page
+            )
+        else:
+            next_post_page_url = None
+        if previous_post_page_number:
+            previous_post_page_url = '{}?post_page={}&comment_page={}'.format(
+                url, previous_post_page_number, current_comment_page
+            )
+        else:
+            previous_post_page_url = None
+
+        return {
+            'pagination': {
+                'count': posts.count(),
+                'page': current_post_page,
+                'page_size': page_size,
+                'next_post_page_url': next_post_page_url,
+                'previous_post_page_url': previous_post_page_url
+            },
+            'post_list': post_list
+        }
 
     def get_comments(self, user):
-        """ Return comments only if owner makes request """
-        if self.context['request'].user == user:
-            comments = Comment.objects.all().filter(author=user)
+        """ Return list of user comments """
+        url = self.context['request'].build_absolute_uri('?')
+
+        page_size = 15
+
+        current_post_page = self.context['request'].GET.get('post_page', '1')
+        current_post_page = int(current_post_page) if current_post_page.isdigit() else 1
+
+        current_comment_page = self.context['request'].GET.get('comment_page', '1')
+        current_comment_page = int(current_comment_page) if current_comment_page.isdigit() else 1
+
+        comments = Comment.objects.all().filter(author=user)
+
+        paginator = Paginator(comments, page_size)
+
+        try:
+            paginated_comments = paginator.page(current_comment_page)
+        except EmptyPage:
+            current_comment_page = paginator.num_pages
+            paginated_comments = paginator.page(paginator.num_pages)
+
+        serializer = CommentSerializer(paginated_comments, many=True, context={'request': self.context['request']})
+        comment_list = serializer.data
+
+        next_comment_page_number = paginated_comments.next_page_number() if paginated_comments.has_next() else None
+        previous_comment_page_number = paginated_comments.previous_page_number() if paginated_comments.has_previous() else None
+
+        if next_comment_page_number:
+            next_comment_page_url = '{}?post_page={}&comment_page={}'.format(
+                url, current_post_page, next_comment_page_number
+            )
         else:
-            comments = []
-        serializer = CommentSerializer(comments, many=True, context={'request': self.context['request']})
-        return serializer.data
+            next_comment_page_url = None
+        if previous_comment_page_number:
+            previous_comment_page_url = '{}?post_page={}&comment_page={}'.format(
+                url, current_post_page, previous_comment_page_number)
+        else:
+            previous_comment_page_url = None
+
+        return {
+            'pagination': {
+                'count': comments.count(),
+                'page': current_comment_page,
+                'page_size': page_size,
+                'next_comment_page_url': next_comment_page_url,
+                'previous_comment_page_url': previous_comment_page_url
+            },
+            'coment_list': comment_list
+        }
 
     class Meta:
         User = get_user_model()
