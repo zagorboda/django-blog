@@ -270,7 +270,7 @@ class PostDetailTest(TestCase):
         client = Client()
         response = client.post(reverse('api:post-detail', kwargs={'slug': 'slug'}))
 
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_comment_post_detail(self):
         """ Make POST request (create new comment) to post detail page by authorized user"""
@@ -292,6 +292,8 @@ class PostDetailTest(TestCase):
         serializer = CommentSerializer(comment, context={'request': None})  # request None?
 
         number_of_comments = Comment.objects.all().count()
+
+        response.data['report_url'] = response.data['report_url'][17:]
 
         self.assertEqual(serializer.data, response.data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -373,6 +375,9 @@ class PostDetailTest(TestCase):
         serializer = PostDetailSerializer(post, context={'request': None})
 
         number_of_comments = Comment.objects.all().filter(post=post).count()
+
+        for comment in response.data['comments']:
+            comment['report_url'] = comment['report_url'][17:]
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -623,7 +628,7 @@ class CreateNewPost(TestCase):
         response = client.post(
             reverse('api:new-post'),
             data=json.dumps({}),
-            content_type='multipart/form-data'
+            content_type='application/json'
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -638,7 +643,7 @@ class CreateNewPost(TestCase):
             reverse('api:new-post'),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({}),
-            content_type='multipart/form-data'
+            content_type='application/json'
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -647,13 +652,13 @@ class CreateNewPost(TestCase):
         """ Make POST request with valid data """
         client = Client()
 
-        client.login(username=self.user.username, password=self.password)
+        # client.login(username=self.user.username, password=self.password)
 
         response = client.post(
             reverse('api:new-post'),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
-            content_type='multipart/form-data'
+            content_type='application/json'
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -669,11 +674,11 @@ class CreateNewPost(TestCase):
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content",
                              "some_extra_field": "test value", "status": 1}),
-            content_type='multipart/form-data'
+            content_type='application/json'
         )
         post = Post.objects.all()[0]
 
-        self.assertEqual(post.status, 0)
+        self.assertEqual(post.status, 1)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
@@ -836,7 +841,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
             content_type='application/json'
@@ -854,7 +859,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": self.test_post.content}),
             content_type='application/json'
@@ -872,7 +877,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"content": "Test content", "title": self.test_post.title}),
             content_type='application/json'
@@ -890,7 +895,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.get(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
 
@@ -905,7 +910,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             data=json.dumps({"content": "Test content", "title": self.test_post.title}),
             content_type='application/json'
         )
@@ -938,13 +943,14 @@ class EditPostTest(TestCase):
 
         another_auth_token = response.data['access']
 
-        response = client.get(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+        response = client.patch(
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(another_auth_token),
+            data=json.dumps({"content": "Test content", "title": "test title"})
         )
 
-        self.assertEqual(response.data['detail'], "You don't have permission to edit this post")
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data['detail'], 'You do not have permission to perform this action.')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class SearchPostTest(TestCase):

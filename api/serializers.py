@@ -1,25 +1,21 @@
+from datetime import datetime
+
 from django.contrib.auth import get_user_model, password_validation
 from django.core import exceptions
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.validators import validate_email
+from django.utils.crypto import get_random_string
 from django.utils.encoding import force_bytes, force_text
 from django.utils.http import urlsafe_base64_decode
+from django.utils.text import slugify
 
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
 from rest_framework.reverse import reverse
 
 from blog_app.models import Post, Comment, Tag
 
 from .tokens import password_reset_token
-
-# class FieldMixin(object):
-#     def get_field_names(self, *args, **kwargs):
-#         field_names = self.context.get('fields', None)
-#         if field_names:
-#             return field_names
-#
-#         return super(FieldMixin, self).get_field_names(*args, **kwargs)
+from scripts import filter_html
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -28,10 +24,15 @@ class CommentSerializer(serializers.ModelSerializer):
     author_username = serializers.ReadOnlyField(source='author.username')
     status = serializers.ReadOnlyField()
 
+    report_url = serializers.SerializerMethodField('get_report_url')
+
+    def get_report_url(self, obj):
+        request = self.context['request']
+        return reverse('api:report-comment', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=request)
+
     class Meta:
-        # list_serializer_class = FilteredCommentSerializer
         model = Comment
-        fields = ('id', 'author', 'author_username', 'body', 'created_on', 'status')
+        fields = ('id', 'author', 'author_username', 'body', 'created_on', 'status', 'report_url')
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -40,15 +41,14 @@ class TagSerializer(serializers.ModelSerializer):
         model = Tag
         fields = ('tagline',)
         extra_kwargs = {
-            'tagline': {'validators': []},
+            'tagline': {'validators': None},
         }
 
-    def create(self, validated_data):
-        pass # get_or_create
-
-    # def get_unique_validators(self):
-    #     """Overriding method to disable unique checks"""
-    #     return []
+    # def create(self, validated_data):
+    #     pass # get_or_create
+    #
+    # def validate(self, data):
+    #     return data
 
 
 class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
@@ -57,27 +57,23 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
 
-    # comments = CommentSerializer(many=True, read_only=True)
     comments = serializers.SerializerMethodField('get_active_comments')
-    # edit_url = serializers.HyperlinkedRelatedField(view_name='edit-post', read_only=True, lookup_field='slug')
-    edit_url = serializers.SerializerMethodField('get_edit_url')
 
     total_views = serializers.SerializerMethodField('get_hits_count')
     total_likes = serializers.SerializerMethodField('get_likes')
     like_url = serializers.SerializerMethodField('get_like_url')
     report_url = serializers.SerializerMethodField('get_report_url')
 
-    # tags = serializers.SerializerMethodField('get_tags')
-    tags = TagSerializer(many=True, read_only=False, required=False)
-    # image = serializers.ImageField(max_length=None, allow_empty_file=True, allow_null=True, required=False)
-    # image_url = serializers.SerializerMethodField('get_image_url')
+    tags = TagSerializer(many=True, required=False, validators=[])
 
     class Meta:
         model = Post
-        fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
-                  'created_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'tags', 'comments')
+        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
+                  'created_on', 'updated_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'tags', 'comments')
         extra_kwargs = {
             'tags': {'validators': []},
+            'slug': {'read_only': True},
+            'status': {'read_only': True},
         }
 
     def get_active_comments(self, obj):
@@ -85,13 +81,6 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         posts = Comment.objects.all().filter(status=1, post=obj)
         serializer = CommentSerializer(posts, many=True, context={'request': self.context['request']})
         return serializer.data
-
-    def get_edit_url(self, obj):
-        """ Return url to edit-post view """
-        request = self.context['request']
-        if request and request.user.id == obj.author.id:
-            return reverse('api:edit-post', kwargs={'slug': obj.slug}, request=request)
-        return None
 
     def get_hits_count(self, obj):
         return obj.hit_count.hits
@@ -107,59 +96,57 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         request = self.context['request']
         return reverse('api:report-post', kwargs={'slug': obj.slug}, request=request)
 
-    def get_tags(self, obj):
-        """ Return tags """
-        tags = Tag.objects.all().filter(post=obj)
-        tag_list = [tag.tagline for tag in tags]
-        return tag_list
+    def create(self, validated_data):
+        tags = validated_data.pop('tags') if 'tags' in validated_data else None
 
-    # def get_image_url(self, obj):
-    #     """ Return url to image """
-    #     if obj.image != '':
-    #         request = self.context.get("request")
-    #         return request.build_absolute_uri(obj.image.url)
-    #     return None
+        title = validated_data['title']
+        content = validated_data['content']
+        author = self.context['request'].user
 
-    # def update(self, instance, validated_data):
-    #     print(validated_data)
-    #     # tags = validated_data.pop('tags', None)
-    #     Post.objects.filter(pk=instance.id).update(**validated_data)
-    #     post = Post.objects.get(pk=instance.id)
-    #     return post
-    #     # print(validated_data)
-    #     # print(obj)
-    #
-    #     # obj.update(**validated_data)
-    #
-    #     # return obj
-    #
-    #     # post = Post.objects.get(data)
-    #     # for track_data in tracks_data:
-    #     #     Track.objects.create(album=album, **track_data)
+        content = filter_html.filter_html_input(content)
 
-    # def create(self, validated_data):
-    #     tags = validated_data.pop('tags')
-    #     post = Post.objects.create(**validated_data)
-    #     return post
-    #
-    # def validate(self, data):
-    #     # for tag in data['tags']:
-    #     #     print(tag)
-    #     return data
+        #  generate slug from user data
+        slug = slugify('{}-{}-{}'.format(
+            validated_data['title'],
+            self.context['request'].user.username,
+            datetime.now().strftime('%Y-%m-%d'))
+        )
+        while Post.objects.filter(slug=slug).exists():
+            slug = '{}-{}'.format(slug, get_random_string(length=2))
 
-    # def get_attr_or_default(self, attr, attrs, default=''):
-    #     """Return the value of key ``attr`` in the dict ``attrs``; if that is
-    #     not present, return the value of the attribute ``attr`` in
-    #     ``self.instance``; otherwise return ``default``.
-    #     """
-    #     return attrs.get(attr, getattr(self.instance, attr, ''))
+        post = Post.objects.create(
+            title=title,
+            content=content,
+            slug=slug,
+            author=author,
+            created_on=datetime.now(),
+            updated_on=datetime.now(),
+            status=1
+        )
 
-    # def get_field_names(self, *args, **kwargs):
-    #     field_names = self.context.get('fields', None)
-    #     if field_names:
-    #         return field_names
-    #
-    #     return super(PostDetailSerializer, self).get_field_names(*args, **kwargs)
+        if tags:
+            list_of_tags = [list(tag.values())[0] for tag in tags]
+
+            post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in list_of_tags])
+
+        return post
+
+    def update(self, post, validated_data):
+        post.title = validated_data.get('title', post.title)
+        content = validated_data.get('content', post.content)
+        content = filter_html.filter_html_input(content)
+        post.content = content
+
+        tags = validated_data.pop('tags') if 'tags' in validated_data else None
+
+        post.save()
+
+        if tags:
+            list_of_tags = [list(tag.values())[0] for tag in tags]
+
+            post.tags.set([Tag.objects.get_or_create(tagline=tag)[0] for tag in list_of_tags])
+
+        return post
 
 
 class PostListSerializer(serializers.HyperlinkedModelSerializer):
@@ -193,8 +180,6 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
 class UserSerializer(serializers.HyperlinkedModelSerializer):
     """ Serialize user information """
     url = serializers.HyperlinkedIdentityField(view_name='api:user-detail', lookup_field='username')
-    # posts = serializers.HyperlinkedRelatedField(many=True, view_name='post-detail', read_only=True,
-    #                                             lookup_field='slug')
     posts = serializers.SerializerMethodField('get_user_posts', read_only=True)
     comments = serializers.SerializerMethodField('get_comments', read_only=True)
 
@@ -310,41 +295,6 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'username', 'bio', 'posts', 'comments')
 
 
-# class CreateUserSerializer(serializers.ModelSerializer):
-#     username = serializers.CharField(
-#             validators=[UniqueValidator(queryset=User.objects.all())]
-#             )
-#     password = serializers.CharField(min_length=8)
-#
-#     def create(self, validated_data):
-#         user = User.objects.create_user(validated_data['username'], '', validated_data['password'])
-#         return user
-#
-#     class Meta:
-#         model = User
-#         fields = ('id', 'password', 'username')
-#         extra_kwargs = {'password': {'write_only': True}}
-
-
-# class RegisterSerializer(serializers.ModelSerializer):
-#
-#     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
-#
-#     class Meta:
-#         User = get_user_model()
-#         model = User
-#         fields = ('username', 'password')
-#
-#     def create(self, validated_data):
-#         User = get_user_model()
-#         user = User.objects.create_user(username=validated_data['username'])
-#
-#         user.set_password(validated_data['password'])
-#         user.save()
-#
-#         return user
-
-
 class RegisterUserSerializer(serializers.ModelSerializer):
     """ Serializer for user signup """
 
@@ -361,7 +311,6 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         errors = dict()
         try:
             password_validation.validate_password(password, self.context['request'].user)
-            # validate_password(password=password)
         except exceptions.ValidationError as e:
             errors['password'] = list(e.messages)
         if errors:

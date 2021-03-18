@@ -261,3 +261,35 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
+
+# SWAGGER_SETTINGS = {
+#     'exclude_url_names': [],
+#     'exclude_namespaces': [],
+#     'api_version': '0.1',
+#     'relative_paths': False,
+#     'enabled_methods': [
+#         'get',
+#         'post',
+#         'put',
+#         'patch',
+#         'delete'
+#     ],
+#     'api_key': '',
+#     'is_authenticated': True,
+#     'is_superuser': False,
+#     'unauthenticated_user': 'user_app.models.User',
+#     'permission_denied_handler': None,
+#     'resource_access_handler': None,
+#     # 'base_path': 'helloreverb.com/docs',
+#     'doc_expansion': 'none',
+# }
+
+# SWAGGER_SETTINGS = {
+#     'SECURITY_DEFINITIONS': {
+#         'api_key': {
+#             'type': 'apiKey',
+#             'in': 'header',
+#             'name': 'Authorization'
+#         }
+#     },
+# }
