@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.mail import EmailMessage
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
@@ -10,6 +11,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from rest_framework import generics, status, permissions, pagination, filters
 from rest_framework.decorators import api_view, permission_classes
 # from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
+from rest_framework.exceptions import ParseError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -234,7 +236,7 @@ class UserDetail(APIView):
         except User.DoesNotExist:
             raise Http404
 
-        serializer = UserSerializer(queryset, context={'request': request})
+        serializer = UserSerializer(queryset, context={'request': request, 'kwargs': kwargs})
         return Response(serializer.data)
 
     def patch(self, request, *args, **kwargs):
@@ -242,17 +244,86 @@ class UserDetail(APIView):
         username = kwargs.get('username')
 
         User = get_user_model()
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
+        if not User.objects.filter(username=username).exists():
             raise Http404
+        user = User.objects.get(username=username)
+
         if request_user.id == user.id:
             serializer = EditProfileSerializer(request_user, data=request.data, context={'request': request})
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
             return Response(serializer.errors)
-        return Response()
+        return Response()  # TODO
+
+
+class UserObjects(generics.ListAPIView):
+    paginate_by = 5
+
+    def get_serializer_class(self):
+        object_type = self.kwargs.get('object_type', 'posts')
+        if object_type == 'comments':
+            return CommentSerializer
+        return PostListSerializer
+
+    def get_queryset(self):
+        object_type = self.kwargs.get('object_type', 'posts')
+        username = self.kwargs.get('username', None)
+
+        User = get_user_model()
+        if not User.objects.filter(username=username).exists():
+            raise Http404
+        user = User.objects.get(username=username)
+
+        if object_type == 'posts':
+            return Post.objects.all().filter(author=user, status=1)
+        elif object_type == 'comments':
+            return Comment.objects.filter(author=user, status=1)
+        else:
+            raise ParseError(detail="Invalid object type")
+
+
+# class UserObjects(APIView):
+#     """
+#     GET: return list of user objects
+#     """
+#
+#     def get(self, request, *args, **kwargs):
+#         username = kwargs.get('username')
+#         User = get_user_model()
+#         object_type = kwargs.get('object_type')
+#
+#         if object_type == 'posts':
+#             model = Post
+#             serializer_class = PostListSerializer
+#         elif object_type == 'comments':
+#             model = Comment
+#             serializer_class = CommentSerializer
+#         else:
+#             return Response({'detail': 'Invalid object type'}, status.HTTP_404_NOT_FOUND)
+#
+#         if not User.objects.filter(username=username).exists():
+#             return Response({'detail': 'User not found'}, status.HTTP_404_NOT_FOUND)
+#
+#         user = User.objects.get(username=username)
+#         queryset = model.objects.filter(author=user)
+#
+#         page = request.GET.get('page', 1)
+#
+#         paginator = Paginator(queryset, 20)
+#         try:
+#             paginated_queryset = paginator.page(page)
+#         except PageNotAnInteger:
+#             paginated_queryset = paginator.page(1)
+#         except EmptyPage:
+#             paginated_queryset = paginator.page(paginator.num_pages)
+#
+#         serializer = serializer_class(paginated_queryset, many=True, context={'request': request})
+#         data = {
+#             'pagination': 'abc',
+#             "data": serializer.data
+#         }
+#         return Response(data)
 
 
 class BlogMainPage(generics.ListAPIView):

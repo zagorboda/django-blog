@@ -17,7 +17,6 @@ urlpatterns = [
     path('blog/', views.BlogMainPage.as_view(), name='blog_main_page'),
     path('blog/post/', views.CreateNewPost.as_view(), name='new-post'),
     path('blog/post/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
-    # path('blog/post/<str:slug>/edit/', views.EditPost.as_view(), name='edit-post'),
     path('blog/post/<str:slug>/like/', views.PostLikeAPIToggle.as_view(), name='post-like'),
     path('blog/post/<str:slug>/report/', views.PostReportToggle.as_view(), name='report-post'),
     path('blog/post/<str:slug>/report/<int:id>/', views.CommentReportToggle.as_view(), name='report-comment'),
@@ -33,6 +32,7 @@ urlpatterns = [
     path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
 
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
+    path('user/profile/<str:username>/<str:object_type>/', views.UserObjects.as_view(), name='user-objects'),
     path('user/signup/', views.UserCreateApiView.as_view(), name='signup'),
     path('user/token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('user/token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),

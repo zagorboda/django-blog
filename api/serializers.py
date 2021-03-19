@@ -169,13 +169,6 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
     def get_hits_count(self, obj):
         return obj.hit_count.hits
 
-    def get_likes(self, obj):
-        return obj.get_number_of_likes()
-
-    def get_like_url(self, obj):
-        request = self.context['request']
-        return reverse('api:post-like', kwargs={'slug': obj.slug}, request=request)
-
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
     """ Serialize user information """
@@ -186,7 +179,6 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     def get_user_posts(self, user):
         """ Return all user posts if owner makes request, for other users return only published posts """
         url = self.context['request'].build_absolute_uri('?')
-
         page_size = 15
 
         current_post_page = self.context['request'].GET.get('post_page', '1')
