@@ -12,23 +12,12 @@ from django.views.generic import RedirectView
 
 from hitcount.views import HitCountDetailView
 
-# from django.contrib.postgres.search import SearchVector  # Search
+from django.db import connection
 
 from .forms import NewPostForm, CommentForm
 from .models import Post, ReportPost, Tag, Comment, ReportComment
 
 from datetime import datetime
-
-
-class BlogPostCounterMixin(object):
-    def get_context_data(self, **kwargs):
-        context = super(BlogPostCounterMixin, self).get_context_data(**kwargs)
-        blog_post_slug = self.kwargs['slug']
-        if blog_post_slug not in self.request.session:
-            bp = Post.objects.filter(slug=blog_post_slug).update(total_views=+1)
-            # Insert the slug into the session as the user has seen it
-            self.request.session[blog_post_slug] = blog_post_slug
-        return context
 
 
 class PostList(generic.ListView):
@@ -193,51 +182,69 @@ class CommentReportToggle(RedirectView):
 
 class PostDetail(HitCountDetailView):
     """ Show single post """
-    model = Post
     template_name = 'blog_app/post_detail.html'
     count_hit = True
+    context_object_name = 'post'
+
+    def get_object(self, slug):
+        if Post.objects.filter(slug=slug, status=1).exists():
+            return Post.objects.get(slug=slug)
+        raise Http404
 
     def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if self.object.status:
-            context = self.get_context_data(object=self.object)
+        slug = kwargs['slug']
+        self.object = self.get_object(slug)
+
+        if self.object:
+            context = self.get_context_data()
+
             if self.request.user in self.object.likes.all():
                 context['is_liked'] = True
             else:
                 context['is_liked'] = False
+
             context['tags'] = self.object.tags.all()
+
             if self.object.author.id == self.request.user.id:
                 context['is_owner'] = True
             else:
                 context['is_owner'] = False
-            context_object_name = 'post'
+
+            context['parent_comments'] = self.object.get_parent_comments()
+
             return self.render_to_response(context)
         else:
             raise Http404
-            # return HttpResponse(status=404)
 
     def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
         comment_form = CommentForm(data=request.POST)
+        slug = kwargs['slug']
+        self.object = self.get_object(slug)
         if comment_form.is_valid():
-            # Create Comment object but don't save to database yet
             new_comment = comment_form.save(commit=False)
-            # Assign the current post to the comment
+
             new_comment.post = self.object
             new_comment.author = self.request.user
             new_comment.active = True
-            # Save the comment to the database
+            parent_obj = None
+            try:
+                parent_id = int(request.POST.get('parent_id'))
+            except (ValueError, TypeError):
+                parent_id = None
+
+            if parent_id:
+                parent_qs = Comment.objects.filter(id=parent_id)
+                if parent_qs.exists() and parent_qs.count() == 1:
+                    parent_obj = parent_qs.first()
+
+            new_comment.parent = parent_obj
+
             new_comment.save()
         return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': kwargs['slug']}))
 
-    # def get_context_data(self, **kwargs):
-    #     context = super(PostDetail, self).get_context_data(**kwargs)
-    #     blog_post_slug = self.kwargs['slug']
-    #     if blog_post_slug not in self.request.session:
-    #         # bp = Post.objects.filter(slug=btoken log_post_slug).update(total_views=+1)
-    #         # Insert the slug into the session as the user has seen it
-    #         self.request.session[blog_post_slug] = blog_post_slug
-    #     return context
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return context
 
 
 @login_required

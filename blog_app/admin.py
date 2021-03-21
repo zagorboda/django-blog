@@ -49,9 +49,10 @@ class CommentAdmin(admin.ModelAdmin):
     list_display = ('author', 'short_description', 'post_link', 'created_on')
     list_filter = ('status', 'created_on')
     list_display_links = ('author',)
-    readonly_fields = ('post_link',)
+    readonly_fields = ('post_link', 'parent', 'author')
     search_fields = ('body', 'post__title', 'author__username')
-    actions = ['approve_comments']
+    actions = ('approve_comments', )
+    exclude = ('post', )
 
     def approve_comments(self, request, queryset):
         queryset.update(active=True)
