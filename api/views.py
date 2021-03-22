@@ -121,7 +121,6 @@ class PostDetail(APIView):
 
     def post(self, request, slug):
         """Add new comment to post"""
-
         serializer = CommentSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             post = self.get_object(slug)
@@ -141,84 +140,6 @@ class PostDetail(APIView):
 
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class PostLikeAPIToggle(APIView):
-    """ View to like/unlike post """
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def get(self, request, slug):
-        obj = get_object_or_404(Post, slug=slug)
-        user = request.user
-        updated = False
-        liked = False
-        if user.is_authenticated:
-            if user in obj.likes.all():
-                liked = False
-                obj.likes.remove(user)
-            else:
-                liked = True
-                obj.likes.add(user)
-            updated = True
-        data = {
-            "updated": updated,
-            "liked": liked
-        }
-        return Response(data)
-
-
-class PostReportToggle(APIView):
-    """ View to report post """
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def get(self, *args, **kwargs):
-        slug = self.kwargs.get("slug")
-        post = get_object_or_404(Post, slug=slug)
-        user = self.request.user
-
-        if ReportPost.objects.filter(post=post).exists():
-            report = ReportPost.objects.get(post=post)
-            if not report.reports.filter(username=user.username).exists():
-                report.total_reports += 1
-                report.reports.add(user)
-                report.save()
-                data = {'updated': True}
-            else:
-                data = {'updated': False, 'message': 'Post already reported'}
-        else:
-            report = ReportPost.objects.create(post=post)
-            report.total_reports += 1
-            report.reports.add(user)
-            report.save()
-            data = {'updated': True}
-        return Response(data)
-
-
-class CommentReportToggle(APIView):
-    """ View to report comment """
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def get(self, *args, **kwargs):
-        id = self.kwargs.get("id")
-        comment = Comment.objects.get(id=id)
-        user = self.request.user
-
-        if ReportComment.objects.filter(comment=comment).exists():
-            report = ReportComment.objects.get(comment=comment)
-            if not report.reports.filter(username=user.username).exists():
-                report.total_reports += 1
-                report.reports.add(user)
-                report.save()
-                data = {'updated': True}
-            else:
-                data = {'updated': False, 'message': 'Comment already reported'}
-        else:
-            report = ReportComment.objects.create(comment=comment)
-            report.total_reports += 1
-            report.reports.add(user)
-            report.save()
-            data = {'updated': True}
-        return Response(data)
 
 
 class UserDetail(APIView):
@@ -258,7 +179,7 @@ class UserDetail(APIView):
 
 
 class UserObjects(generics.ListAPIView):
-    paginate_by = 5
+    paginate_by = 15
 
     def get_serializer_class(self):
         object_type = self.kwargs.get('object_type', 'posts')
@@ -281,6 +202,33 @@ class UserObjects(generics.ListAPIView):
             return Comment.objects.filter(author=user, status=1)
         else:
             raise ParseError(detail="Invalid object type")
+
+
+class PostComments(generics.ListAPIView):
+    paginate_by = 15
+    serializer_class = CommentSerializer
+
+    def get_queryset(self):
+        slug = self.kwargs.get('slug', None)
+        if slug is None or not Post.objects.filter(slug=slug).exists():
+            raise Http404
+
+        post = Post.objects.get(slug=slug)
+
+        comments = Comment.objects.filter(post=post, status=1, parent=None)
+        return comments
+
+
+class CommentDetail(generics.RetrieveAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+
+    lookup_field = 'id'
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 # class UserObjects(APIView):
@@ -335,8 +283,6 @@ class BlogMainPage(generics.ListAPIView):
 
     filter_backends = (filters.SearchFilter,)
     search_fields = ('title', 'tags__tagline')
-
-    # filter_backends = (DynamicSearchFilter,)
 
 
 class CreateNewPost(APIView):
@@ -487,3 +433,81 @@ class BlacklistTokenView(APIView):
             token.blacklist()
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class PostLikeAPIToggle(APIView):
+    """ View to like/unlike post """
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, slug):
+        obj = get_object_or_404(Post, slug=slug)
+        user = request.user
+        updated = False
+        liked = False
+        if user.is_authenticated:
+            if user in obj.likes.all():
+                liked = False
+                obj.likes.remove(user)
+            else:
+                liked = True
+                obj.likes.add(user)
+            updated = True
+        data = {
+            "updated": updated,
+            "liked": liked
+        }
+        return Response(data)
+
+
+class PostReportToggle(APIView):
+    """ View to report post """
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, *args, **kwargs):
+        slug = self.kwargs.get("slug")
+        post = get_object_or_404(Post, slug=slug)
+        user = self.request.user
+
+        if ReportPost.objects.filter(post=post).exists():
+            report = ReportPost.objects.get(post=post)
+            if not report.reports.filter(username=user.username).exists():
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+                data = {'updated': True}
+            else:
+                data = {'updated': False, 'message': 'Post already reported'}
+        else:
+            report = ReportPost.objects.create(post=post)
+            report.total_reports += 1
+            report.reports.add(user)
+            report.save()
+            data = {'updated': True}
+        return Response(data)
+
+
+class CommentReportToggle(APIView):
+    """ View to report comment """
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, *args, **kwargs):
+        id = self.kwargs.get("id")
+        comment = Comment.objects.get(id=id)
+        user = self.request.user
+
+        if ReportComment.objects.filter(comment=comment).exists():
+            report = ReportComment.objects.get(comment=comment)
+            if not report.reports.filter(username=user.username).exists():
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+                data = {'updated': True}
+            else:
+                data = {'updated': False, 'message': 'Comment already reported'}
+        else:
+            report = ReportComment.objects.create(comment=comment)
+            report.total_reports += 1
+            report.reports.add(user)
+            report.save()
+            data = {'updated': True}
+        return Response(data)

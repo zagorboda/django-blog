@@ -23,16 +23,76 @@ class CommentSerializer(serializers.ModelSerializer):
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
     author_username = serializers.ReadOnlyField(source='author.username')
     status = serializers.ReadOnlyField()
-
     report_url = serializers.SerializerMethodField('get_report_url')
+
+    child_comments = serializers.SerializerMethodField('get_child_comments')
+
+    def validate_parent(self, parent):
+        # Allow user to reply only to top-level comments
+        print(parent, parent.is_parent)
+        if parent.is_parent:
+            return parent
+        raise serializers.ValidationError('Incorrect parent id. Replies allowed only to top-level comments')
 
     def get_report_url(self, obj):
         request = self.context['request']
         return reverse('api:report-comment', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=request)
 
+    def get_child_comments(self, obj):
+        # TODO: check db hits
+        if obj.children() and obj.is_parent:
+            url = reverse('api:comment-detail', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=self.context['request'])
+
+            page_size = 1
+
+            current_page = self.context['request'].query_params.get('page') or 1
+            comments = Comment.objects.all().filter(post=obj.post, status=1, parent=obj)
+            paginator = Paginator(comments, page_size)
+
+            try:
+                paginated_comments = paginator.page(current_page)
+            except EmptyPage:
+                current_page = paginator.num_pages
+                paginated_comments = paginator.page(paginator.num_pages)
+
+            serializer = CommentSerializer(paginated_comments, many=True, context={'request': self.context['request']})
+            comment_list = serializer.data
+
+            next_page_number = paginated_comments.next_page_number() if paginated_comments.has_next() else None
+            previous_page_number = paginated_comments.previous_page_number() if paginated_comments.has_previous() else None
+
+            if next_page_number:
+                next_page_url = '{}?page={}'.format(
+                    url, next_page_number
+                )
+            else:
+                next_page_url = None
+            if previous_page_number:
+                previous_page_url = '{}?page={}'.format(
+                    url, previous_page_number
+                )
+            else:
+                previous_page_url = None
+
+            return {
+                'pagination': {
+                    'count': comments.count(),
+                    'page': current_page,
+                    'page_size': page_size,
+                    'next_page_url': next_page_url,
+                    'previous_page_url': previous_page_url
+                },
+                'comment_list': comment_list
+            }
+        else:
+            return None
+
     class Meta:
         model = Comment
-        fields = ('id', 'author', 'author_username', 'body', 'created_on', 'status', 'report_url')
+        fields = ('id', 'author', 'author_username', 'body', 'parent', 'created_on', 'status', 'report_url', 'child_comments')
+        extra_kwargs = {
+            'parent': {'write_only': True},
+        }
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -78,8 +138,8 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     def get_active_comments(self, obj):
         """ Return only active comments (status=1) """
-        posts = Comment.objects.all().filter(status=1, post=obj)
-        serializer = CommentSerializer(posts, many=True, context={'request': self.context['request']})
+        comments = Comment.objects.all().filter(status=1, post=obj, parent=None)
+        serializer = CommentSerializer(comments, many=True, context={'request': self.context['request']})
         return serializer.data
 
     def get_hits_count(self, obj):
@@ -278,7 +338,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
                 'next_comment_page_url': next_comment_page_url,
                 'previous_comment_page_url': previous_comment_page_url
             },
-            'coment_list': comment_list
+            'comment_list': comment_list
         }
 
     class Meta:
