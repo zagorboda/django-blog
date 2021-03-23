@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.mail import EmailMessage
-from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
@@ -23,8 +22,7 @@ from blog_app.models import Post, Comment, Tag, ReportPost, ReportComment
 from .permissions import IsOwnerOrReadOnly, IsOwnerOrIsAuthenticatedOrReadOnly
 from .serializers import (
     UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterUserSerializer,
-    ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer, EditProfileSerializer,
-    ChildCommentSerializer
+    ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer, EditProfileSerializer
 )
 
 from datetime import datetime
@@ -114,7 +112,7 @@ class PostDetail(APIView):
     GET : return information.
     POST : add new comment (user must be logged in, requires comment body).
     """
-    permission_classes = (IsOwnerOrIsAuthenticatedOrReadOnly, )
+    permission_classes = (IsOwnerOrReadOnly, )
 
     def get_object(self, *args, **kwargs):
         """ Return object or 404 """
@@ -206,7 +204,7 @@ class UserObjects(generics.ListAPIView):
         user = User.objects.get(username=username)
 
         paginator = pagination.PageNumberPagination()
-        paginator.page_size = 10
+        paginator.page_size = 5
 
         if object_type == 'posts':
             query = Post.objects.all().filter(author=user, status=1)
@@ -221,8 +219,10 @@ class UserObjects(generics.ListAPIView):
 
 
 class PostComments(generics.ListCreateAPIView):
-    CustomPageNumberPagination
+    pagination_class = CustomPageNumberPagination
     serializer_class = CommentSerializer
+
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly, )
 
     def get_queryset(self):
         slug = self.kwargs.get('slug', None)
@@ -250,7 +250,7 @@ class PostComments(generics.ListCreateAPIView):
 
 class CommentDetail(generics.RetrieveAPIView):
     queryset = Comment.objects.all()
-    serializer_class = ChildCommentSerializer
+    serializer_class = CommentSerializer
 
     lookup_field = 'id'
 
@@ -261,7 +261,7 @@ class CommentDetail(generics.RetrieveAPIView):
 
 
 class ChildrenComments(generics.ListAPIView):
-    CustomPageNumberPagination
+    pagination_class = CustomPageNumberPagination
     serializer_class = CommentSerializer
 
     lookup_field = 'id'
@@ -269,61 +269,17 @@ class ChildrenComments(generics.ListAPIView):
     def get_queryset(self):
         slug = self.kwargs.get('slug', None)
         parent_id = self.kwargs.get('id', None)
-        print(slug, parent_id)
+
         if slug is None or not Post.objects.filter(slug=slug).exists():
             raise Http404('Post with this slug does not exists')
 
         if parent_id is None or not Comment.objects.filter(id=parent_id).exists():
             raise Http404('Comment with this id does not exists')
 
-        post = Post.objects.get(slug=slug)
         parent_comment = Comment.objects.get(id=parent_id)
 
         comments = Comment.objects.filter(status=1, parent=parent_comment)
         return comments
-
-
-# class UserObjects(APIView):
-#     """
-#     GET: return list of user objects
-#     """
-#
-#     def get(self, request, *args, **kwargs):
-#         username = kwargs.get('username')
-#         User = get_user_model()
-#         object_type = kwargs.get('object_type')
-#
-#         if object_type == 'posts':
-#             model = Post
-#             serializer_class = PostListSerializer
-#         elif object_type == 'comments':
-#             model = Comment
-#             serializer_class = CommentSerializer
-#         else:
-#             return Response({'detail': 'Invalid object type'}, status.HTTP_404_NOT_FOUND)
-#
-#         if not User.objects.filter(username=username).exists():
-#             return Response({'detail': 'User not found'}, status.HTTP_404_NOT_FOUND)
-#
-#         user = User.objects.get(username=username)
-#         queryset = model.objects.filter(author=user)
-#
-#         page = request.GET.get('page', 1)
-#
-#         paginator = Paginator(queryset, 20)
-#         try:
-#             paginated_queryset = paginator.page(page)
-#         except PageNotAnInteger:
-#             paginated_queryset = paginator.page(1)
-#         except EmptyPage:
-#             paginated_queryset = paginator.page(paginator.num_pages)
-#
-#         serializer = serializer_class(paginated_queryset, many=True, context={'request': request})
-#         data = {
-#             'pagination': 'abc',
-#             "data": serializer.data
-#         }
-#         return Response(data)
 
 
 class BlogMainPage(generics.ListAPIView):
@@ -347,7 +303,7 @@ class CreateNewPost(APIView):
     serializer_class = PostDetailSerializer
     # parser_class = (MultiPartParser,)
     # parser_classes = [gen_MultipartJsonParser(['title', 'content'])]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = (permissions.IsAuthenticated, )
 
     def get(self, request):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)

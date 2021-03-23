@@ -35,7 +35,7 @@ urlpatterns = [
     path('hitcount/', include(('hitcount.urls', 'hitcount'), namespace='hitcount')),
 
     path('user/profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
-    path('user/profile/<str:username>/<str:object_type>/', views.UserObjects.as_view(), name='user-objects'),
+    path('user/profile/<str:username>/objects/<str:object_type>/', views.UserObjects.as_view(), name='user-objects'),
     path('user/signup/', views.UserCreateApiView.as_view(), name='signup'),
     path('user/token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('user/token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
