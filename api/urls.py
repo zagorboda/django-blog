@@ -19,6 +19,7 @@ urlpatterns = [
     path('blog/post/<str:slug>/', views.PostDetail.as_view(), name='post-detail'),
     path('blog/post/<str:slug>/comments/', views.PostComments.as_view(), name='post-comments'),
     path('blog/post/<str:slug>/comments/<int:id>/', views.CommentDetail.as_view(), name='comment-detail'),
+    path('blog/post/<str:slug>/comments/<int:id>/children/', views.ChildrenComments.as_view(), name='children-comments'),
     path('blog/post/<str:slug>/like/', views.PostLikeAPIToggle.as_view(), name='post-like'),
     path('blog/post/<str:slug>/report/', views.PostReportToggle.as_view(), name='report-post'),
     path('blog/post/<str:slug>/report/<int:id>/', views.CommentReportToggle.as_view(), name='report-comment'),

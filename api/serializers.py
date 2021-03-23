@@ -24,26 +24,59 @@ class CommentSerializer(serializers.ModelSerializer):
     author_username = serializers.ReadOnlyField(source='author.username')
     status = serializers.ReadOnlyField()
     report_url = serializers.SerializerMethodField('get_report_url')
-
-    child_comments = serializers.SerializerMethodField('get_child_comments')
+    child_comments_url = serializers.SerializerMethodField('get_child_comments_url')
+    post_url = serializers.SerializerMethodField('get_post_url')
 
     def validate_parent(self, parent):
         # Allow user to reply only to top-level comments
-        print(parent, parent.is_parent)
         if parent.is_parent:
             return parent
         raise serializers.ValidationError('Incorrect parent id. Replies allowed only to top-level comments')
 
+    def get_post_url(self, obj):
+        request = self.context['request']
+        return reverse('api:post-detail', kwargs={'slug': obj.post.slug}, request=request)
+
     def get_report_url(self, obj):
         request = self.context['request']
         return reverse('api:report-comment', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=request)
+
+    def get_child_comments_url(self, obj):
+        if obj.children() and obj.is_parent:
+            request = self.context['request']
+            return reverse('api:comment-detail', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=request)
+
+    class Meta:
+        model = Comment
+        fields = ('id', 'author', 'author_username', 'body', 'parent', 'created_on', 'status', 'report_url',
+                  'parent_id', 'parent', 'post_url', 'child_comments_url')
+        extra_kwargs = {
+            'parent': {'write_only': True},
+        }
+
+
+class ChildCommentSerializer(serializers.ModelSerializer):
+    author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
+    author_username = serializers.ReadOnlyField(source='author.username')
+    status = serializers.ReadOnlyField()
+    report_url = serializers.SerializerMethodField('get_report_url')
+    child_comments = serializers.SerializerMethodField()
+    post_url = serializers.SerializerMethodField('get_post_url')
+
+    def get_report_url(self, obj):
+        request = self.context['request']
+        return reverse('api:report-comment', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=request)
+
+    def get_post_url(self, obj):
+        request = self.context['request']
+        return reverse('api:post-detail', kwargs={'slug': obj.post.slug}, request=request)
 
     def get_child_comments(self, obj):
         # TODO: check db hits
         if obj.children() and obj.is_parent:
             url = reverse('api:comment-detail', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=self.context['request'])
 
-            page_size = 1
+            page_size = 10
 
             current_page = self.context['request'].query_params.get('page') or 1
             comments = Comment.objects.all().filter(post=obj.post, status=1, parent=obj)
@@ -89,14 +122,14 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ('id', 'author', 'author_username', 'body', 'parent', 'created_on', 'status', 'report_url', 'child_comments')
+        fields = ('id', 'author', 'author_username', 'body', 'parent', 'created_on', 'status', 'report_url',
+                  'parent_id', 'post_url', 'child_comments')
         extra_kwargs = {
             'parent': {'write_only': True},
         }
 
 
 class TagSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Tag
         fields = ('tagline',)
@@ -117,7 +150,7 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
 
-    comments = serializers.SerializerMethodField('get_active_comments')
+    comments_url = serializers.SerializerMethodField('get_comments_url')
 
     total_views = serializers.SerializerMethodField('get_hits_count')
     total_likes = serializers.SerializerMethodField('get_likes')
@@ -128,19 +161,17 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Post
-        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
-                  'created_on', 'updated_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'tags', 'comments')
+        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on',
+                  'updated_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'tags', 'comments_url')
         extra_kwargs = {
             'tags': {'validators': []},
             'slug': {'read_only': True},
             'status': {'read_only': True},
         }
 
-    def get_active_comments(self, obj):
-        """ Return only active comments (status=1) """
-        comments = Comment.objects.all().filter(status=1, post=obj, parent=None)
-        serializer = CommentSerializer(comments, many=True, context={'request': self.context['request']})
-        return serializer.data
+    def get_comments_url(self, obj):
+        """ Return url to resource with list of related comments """
+        return reverse('api:post-comments', kwargs={'slug': obj.slug}, request=self.context['request'])
 
     def get_hits_count(self, obj):
         return obj.hit_count.hits
@@ -149,12 +180,10 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         return obj.get_number_of_likes()
 
     def get_like_url(self, obj):
-        request = self.context['request']
-        return reverse('api:post-like', kwargs={'slug': obj.slug}, request=request)
+        return reverse('api:post-like', kwargs={'slug': obj.slug}, request=self.context['request'])
 
     def get_report_url(self, obj):
-        request = self.context['request']
-        return reverse('api:report-post', kwargs={'slug': obj.slug}, request=request)
+        return reverse('api:report-post', kwargs={'slug': obj.slug}, request=self.context['request'])
 
     def create(self, validated_data):
         tags = validated_data.pop('tags') if 'tags' in validated_data else None
@@ -239,7 +268,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     def get_user_posts(self, user):
         """ Return all user posts if owner makes request, for other users return only published posts """
         url = self.context['request'].build_absolute_uri('?')
-        page_size = 15
+        page_size = 10
 
         current_post_page = self.context['request'].GET.get('post_page', '1')
         current_post_page = int(current_post_page) if current_post_page.isdigit() else 1
@@ -294,7 +323,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         """ Return list of user comments """
         url = self.context['request'].build_absolute_uri('?')
 
-        page_size = 15
+        page_size = 10
 
         current_post_page = self.context['request'].GET.get('post_page', '1')
         current_post_page = int(current_post_page) if current_post_page.isdigit() else 1

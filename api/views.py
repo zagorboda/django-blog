@@ -23,7 +23,8 @@ from blog_app.models import Post, Comment, Tag, ReportPost, ReportComment
 from .permissions import IsOwnerOrReadOnly, IsOwnerOrIsAuthenticatedOrReadOnly
 from .serializers import (
     UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterUserSerializer,
-    ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer, EditProfileSerializer
+    ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer, EditProfileSerializer,
+    ChildCommentSerializer
 )
 
 from datetime import datetime
@@ -55,6 +56,7 @@ class PostListPagination(pagination.PageNumberPagination):
     page = 1
     page_size = 15
     page_size_query_param = 'page_size'
+    max_page_size = 50
 
     def get_paginated_response(self, data):
         response_data = {
@@ -90,6 +92,22 @@ class PostListPagination(pagination.PageNumberPagination):
         return Response(response_data)
 
 
+class CustomPageNumberPagination(pagination.PageNumberPagination):
+
+    page_size = 10
+    max_page_size = 50
+    page_size_query_param = 'page_size'
+
+    def get_paginated_response(self, data):
+        return Response({
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'count': self.page.paginator.count,
+            'limit': self.page_size,
+            'results': data
+        })
+
+
 class PostDetail(APIView):
     """ Return all information about post.
 
@@ -118,15 +136,6 @@ class PostDetail(APIView):
         hit_count_response = HitCountMixin.hit_count(request, hit_count)
 
         return Response(serializer.data)
-
-    def post(self, request, slug):
-        """Add new comment to post"""
-        serializer = CommentSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            post = self.get_object(slug)
-            serializer.save(author=self.request.user, created_on=datetime.now(), post=post)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, slug):
         """ Edit post fields """
@@ -179,7 +188,7 @@ class UserDetail(APIView):
 
 
 class UserObjects(generics.ListAPIView):
-    paginate_by = 15
+    pagination_class = CustomPageNumberPagination
 
     def get_serializer_class(self):
         object_type = self.kwargs.get('object_type', 'posts')
@@ -196,16 +205,23 @@ class UserObjects(generics.ListAPIView):
             raise Http404
         user = User.objects.get(username=username)
 
+        paginator = pagination.PageNumberPagination()
+        paginator.page_size = 10
+
         if object_type == 'posts':
-            return Post.objects.all().filter(author=user, status=1)
+            query = Post.objects.all().filter(author=user, status=1)
         elif object_type == 'comments':
-            return Comment.objects.filter(author=user, status=1)
+            query = Comment.objects.filter(author=user, status=1)
         else:
             raise ParseError(detail="Invalid object type")
 
+        result_page = paginator.paginate_queryset(query, self.request)
+        return result_page
+        # serializer = self.serializer_class(result_page, many=True)
 
-class PostComments(generics.ListAPIView):
-    paginate_by = 15
+
+class PostComments(generics.ListCreateAPIView):
+    CustomPageNumberPagination
     serializer_class = CommentSerializer
 
     def get_queryset(self):
@@ -218,10 +234,23 @@ class PostComments(generics.ListAPIView):
         comments = Comment.objects.filter(post=post, status=1, parent=None)
         return comments
 
+    def post(self, request, *args, **kwargs):
+        """Add new comment to post"""
+        slug = kwargs.get('slug')
+        serializer = CommentSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            if Post.objects.filter(slug=slug).exists():
+                post = Post.objects.get(slug=slug)
+            else:
+                raise Http404
+            serializer.save(author=self.request.user, created_on=datetime.now(), post=post)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class CommentDetail(generics.RetrieveAPIView):
     queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
+    serializer_class = ChildCommentSerializer
 
     lookup_field = 'id'
 
@@ -229,6 +258,29 @@ class CommentDetail(generics.RetrieveAPIView):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+
+class ChildrenComments(generics.ListAPIView):
+    CustomPageNumberPagination
+    serializer_class = CommentSerializer
+
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        slug = self.kwargs.get('slug', None)
+        parent_id = self.kwargs.get('id', None)
+        print(slug, parent_id)
+        if slug is None or not Post.objects.filter(slug=slug).exists():
+            raise Http404('Post with this slug does not exists')
+
+        if parent_id is None or not Comment.objects.filter(id=parent_id).exists():
+            raise Http404('Comment with this id does not exists')
+
+        post = Post.objects.get(slug=slug)
+        parent_comment = Comment.objects.get(id=parent_id)
+
+        comments = Comment.objects.filter(status=1, parent=parent_comment)
+        return comments
 
 
 # class UserObjects(APIView):
