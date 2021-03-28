@@ -44,13 +44,14 @@ def schema_view():
 def api_root(request, format=None):
     return Response({
         'blog': reverse('api:blog_main_page', request=request, format=format),
-        'user': reverse('api:schema', request=request, format=format),
         'schema': reverse('api:schema', request=request, format=format),
     })
 
 
 class PostListPagination(pagination.PageNumberPagination):
-    """ Custom pagination for posts """
+    """
+    Custom pagination for posts
+    """
     page = 1
     page_size = 15
     page_size_query_param = 'page_size'
@@ -91,7 +92,9 @@ class PostListPagination(pagination.PageNumberPagination):
 
 
 class CustomPageNumberPagination(pagination.PageNumberPagination):
-
+    """
+    Custom number pagination
+    """
     page_size = 10
     max_page_size = 50
     page_size_query_param = 'page_size'
@@ -107,10 +110,11 @@ class CustomPageNumberPagination(pagination.PageNumberPagination):
 
 
 class PostDetail(APIView):
-    """ Return all information about post.
+    """
+    Return detail information about blogpost.
 
     GET : return information.
-    POST : add new comment (user must be logged in, requires comment body).
+    PATCH : edit blogpost.
     """
     permission_classes = (IsOwnerOrReadOnly, )
 
@@ -125,7 +129,7 @@ class PostDetail(APIView):
             raise Http404
 
     def get(self, request, slug):
-        """ Return detail post information """
+        """ Return detail blogpost information """
 
         post = self.get_object(slug)
         serializer = PostDetailSerializer(post, context={'request': request})
@@ -136,7 +140,7 @@ class PostDetail(APIView):
         return Response(serializer.data)
 
     def patch(self, request, slug):
-        """ Edit post fields """
+        """ Edit blogpost fields """
 
         post = self.get_object(slug)
         data = request.data.copy()
@@ -150,13 +154,22 @@ class PostDetail(APIView):
 
 
 class UserDetail(APIView):
-    """ GET: return user information
-        PATCH: edit user profile"""
+    """
+    Return user information.
+
+    GET: return user information.
+    PATCH: edit user information(
+        fields: bio,
+    ).
+    """
     permission_classes = (IsOwnerOrReadOnly, )
 
     lookup_field = 'username'
 
     def get(self, request, *args, **kwargs):
+        """
+        Retrieve user information
+        """
         username = kwargs.get('username')
         User = get_user_model()
         try:
@@ -168,6 +181,9 @@ class UserDetail(APIView):
         return Response(serializer.data)
 
     def patch(self, request, *args, **kwargs):
+        """
+        Edit user information
+        """
         request_user = request.user
         username = kwargs.get('username')
 
@@ -182,22 +198,33 @@ class UserDetail(APIView):
                 serializer.save()
                 return Response(serializer.data)
             return Response(serializer.errors)
-        return Response()  # TODO
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
 
 class UserObjects(generics.ListAPIView):
+    """
+    Return list of user related objects (blogposts, comments).
+    """
+
     pagination_class = CustomPageNumberPagination
 
     def get_serializer_class(self):
+        """
+        Determine serializer for different object type.
+        """
+
         object_type = self.kwargs.get('object_type', 'posts')
         if object_type == 'comments':
             return CommentSerializer
         return PostListSerializer
 
     def get_queryset(self):
+        """
+        Determine queryset for different object type.
+        """
+
         object_type = self.kwargs.get('object_type', 'posts')
         username = self.kwargs.get('username', None)
-
         User = get_user_model()
         if not User.objects.filter(username=username).exists():
             raise Http404
@@ -206,19 +233,27 @@ class UserObjects(generics.ListAPIView):
         paginator = pagination.PageNumberPagination()
         paginator.page_size = 5
 
+        if user.id == self.request.user.id:
+            objects_status = (0, 1)
+        else:
+            objects_status = (1, )
+
         if object_type == 'posts':
-            query = Post.objects.all().filter(author=user, status=1)
+            query = Post.objects.all().filter(author=user, status__in=objects_status)
         elif object_type == 'comments':
-            query = Comment.objects.filter(author=user, status=1)
+            query = Comment.objects.filter(author=user, status__in=objects_status)
         else:
             raise ParseError(detail="Invalid object type")
 
         result_page = paginator.paginate_queryset(query, self.request)
         return result_page
-        # serializer = self.serializer_class(result_page, many=True)
 
 
 class PostComments(generics.ListCreateAPIView):
+    """
+    Return list of blogpost related comments.
+    """
+
     pagination_class = CustomPageNumberPagination
     serializer_class = CommentSerializer
 
@@ -235,7 +270,9 @@ class PostComments(generics.ListCreateAPIView):
         return comments
 
     def post(self, request, *args, **kwargs):
-        """Add new comment to post"""
+        """
+        Add new comment to blogpost
+        """
         slug = kwargs.get('slug')
         serializer = CommentSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
@@ -249,6 +286,12 @@ class PostComments(generics.ListCreateAPIView):
 
 
 class CommentDetail(generics.RetrieveAPIView):
+    """
+    Retrieve detail comment information.
+
+    Require post slug and comment id.
+    """
+
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
 
@@ -261,6 +304,10 @@ class CommentDetail(generics.RetrieveAPIView):
 
 
 class ChildrenComments(generics.ListAPIView):
+    """
+    Return list of children comments related to some parent comment.
+    """
+
     pagination_class = CustomPageNumberPagination
     serializer_class = CommentSerializer
 
@@ -284,6 +331,7 @@ class ChildrenComments(generics.ListAPIView):
 
 class BlogMainPage(generics.ListAPIView):
     """ Return most recent posts """
+
     queryset = Post.objects.all().filter(status=1)
     serializer_class = PostListSerializer
 
@@ -294,18 +342,26 @@ class BlogMainPage(generics.ListAPIView):
 
 
 class CreateNewPost(APIView):
-    """ Create new post.
+    """ Create new blogpost.
+    User must be logged in.
+    Required fields : title, content(HTML markup).
+    Optional fields: tags(list of items).
+    Return created blogpost information.
 
-    POST : user must be logged in.
-    Requires : title, content(HTML markup).
-    Additional fields: tags(list of items).
+    Example:
+        {
+        "title": "Some title",
+        "content": "Some html markdown from WYSIWYG",
+        "tags": [
+            {"tagline": "sport"},
+            {"tagline": "music"}
+        ]
+        }
     """
     serializer_class = PostDetailSerializer
-    # parser_class = (MultiPartParser,)
-    # parser_classes = [gen_MultipartJsonParser(['title', 'content'])]
     permission_classes = (permissions.IsAuthenticated, )
 
-    def get(self, request):
+    def get(self):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def post(self, request):
@@ -322,10 +378,13 @@ class CreateNewPost(APIView):
 
 
 class UserCreateApiView(APIView):
-    """ Create new user
+    """
+    Create new user.
 
     POST : create new user.
-    Requires : username(unique), email(unique), password"""
+    Required fields : username(unique), email(unique), password.
+    Return nothing, send confirmation to user email.
+    """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -352,7 +411,10 @@ class UserCreateApiView(APIView):
 
 
 class ConfirmEmail(APIView):
-    """ Confirm user email and activate account """
+    """
+    Confirm user email and activate account
+    """
+
     def get(self, request, uidb64, token):
         User = get_user_model()
         try:
@@ -369,25 +431,29 @@ class ConfirmEmail(APIView):
 
 
 class ChangePassword(APIView):
-    """ Endpoint to change user password
+    """
+    Change user password
 
     Patch:
-        old_password - user old password
-        new_password1 - new user password
-        new_password2 - new user password
+    Required fields: old_password, new_password1, new_password2
     """
+
     permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request, *args, **kwargs):
         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        # TODO: blacklist and generate new JWT token ?delete token on client side?
         return Response(status=status.HTTP_200_OK)
 
 
 class ResetPasswordEmail(APIView):
-    """ Send password reset email to user """
+    """
+    Send password reset email to user
+
+    Post: send email.
+    Required fields: email.
+    """
 
     def post(self, request):
         """ Send password reset email to user """
@@ -419,7 +485,9 @@ class ResetPasswordEmail(APIView):
 
 
 class ResetPassword(APIView):
-    """ Receive and update user password """
+    """
+    Reset user password using token from email.
+    """
 
     def patch(self, request, uidb64, token):
         serializer = ResetPasswordSerializer(data=request.data,
@@ -431,7 +499,9 @@ class ResetPassword(APIView):
 
 
 class BlacklistTokenView(APIView):
-    """ Blacklist JWT token """
+    """
+    Blacklist JWT token
+    """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -444,7 +514,10 @@ class BlacklistTokenView(APIView):
 
 
 class PostLikeAPIToggle(APIView):
-    """ View to like/unlike post """
+    """
+    Endpoint to like/unlike post
+    """
+
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, slug):
@@ -468,7 +541,10 @@ class PostLikeAPIToggle(APIView):
 
 
 class PostReportToggle(APIView):
-    """ View to report post """
+    """
+    Endpoint to report post
+    """
+
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, *args, **kwargs):
@@ -495,7 +571,10 @@ class PostReportToggle(APIView):
 
 
 class CommentReportToggle(APIView):
-    """ View to report comment """
+    """
+    Endpoint to report comment
+    """
+
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, *args, **kwargs):

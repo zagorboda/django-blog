@@ -19,7 +19,10 @@ from scripts import filter_html
 
 
 class CommentSerializer(serializers.ModelSerializer):
-    """ Serialize comments """
+    """
+    Serialize comments
+    """
+
     url = serializers.SerializerMethodField('get_url')
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
     author_username = serializers.ReadOnlyField(source='author.username')
@@ -61,13 +64,23 @@ class CommentSerializer(serializers.ModelSerializer):
 
 
 class TagSerializer(serializers.ModelSerializer):
+    """
+    Serialize taglines
+    """
+
     class Meta:
         model = Tag
         fields = ('tagline',)
+        extra_kwargs = {
+            'tagline': {'validators': []},
+        }
 
 
 class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
-    """ Serialize post, return list of comments """
+    """
+    Serialize detail blogpost information
+    """
+
     url = serializers.HyperlinkedIdentityField(view_name='api:post-detail', lookup_field='slug')
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
@@ -86,7 +99,6 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on',
                   'updated_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'tags', 'comments_url')
         extra_kwargs = {
-            'tags': {'validators': []},
             'slug': {'read_only': True},
             'status': {'read_only': True},
         }
@@ -161,7 +173,10 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PostListSerializer(serializers.HyperlinkedModelSerializer):
-    """ Serialize posts; content length is 200 chars, don't return comments and edit_url"""
+    """
+    Serialize blogposts list
+    """
+
     url = serializers.HyperlinkedIdentityField(view_name='api:post-detail', lookup_field='slug')
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
@@ -182,7 +197,10 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
-    """ Serialize user information """
+    """
+    Serialize user information
+    """
+
     url = serializers.HyperlinkedIdentityField(view_name='api:user-detail', lookup_field='username')
     posts = serializers.SerializerMethodField('get_user_posts', read_only=True)
     comments = serializers.SerializerMethodField('get_comments', read_only=True)
@@ -206,7 +224,9 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class RegisterUserSerializer(serializers.ModelSerializer):
-    """ Serializer for user signup """
+    """
+    Serialize user signup
+    """
 
     class Meta:
         User = get_user_model()
@@ -239,7 +259,10 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    """ Serializer for password change endpoint """
+    """
+    Serialize password change
+    """
+
     old_password = serializers.CharField(write_only=True, required=True)
     new_password1 = serializers.CharField(write_only=True, required=True)
     new_password2 = serializers.CharField(write_only=True, required=True)
@@ -265,13 +288,17 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class ResetPasswordEmailSerializer(serializers.Serializer):
-    """ Serializer for email input for password reset endpoint """
+    """
+    Serialize email input for password reset
+    """
 
     email = serializers.EmailField()
 
 
 class ResetPasswordSerializer(serializers.Serializer):
-    """ Serializer for password reset """
+    """
+    Serialize password reset
+    """
 
     new_password = serializers.CharField(write_only=True, required=True)
 
@@ -292,6 +319,9 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 class EditProfileSerializer(serializers.ModelSerializer):
+    """
+    Serialize user profile changes
+    """
 
     def update(self, instance, validated_data):
         return super().update(instance, validated_data)
