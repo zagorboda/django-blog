@@ -1,8 +1,7 @@
-from django.contrib.auth.decorators import login_required  # permission_required
-from django.contrib.postgres.search import SearchVector
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q  # Search
-from django.http import HttpResponseRedirect, Http404  # HttpResponse
+from django.db.models import Q
+from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render, get_object_or_404
 from django.template.defaultfilters import slugify
 from django.urls import reverse
@@ -11,8 +10,6 @@ from django.views import generic
 from django.views.generic import RedirectView
 
 from hitcount.views import HitCountDetailView
-
-from django.db import connection
 
 from .forms import NewPostForm, CommentForm
 from .models import Post, ReportPost, Tag, Comment, ReportComment
@@ -23,161 +20,18 @@ from datetime import datetime
 class PostList(generic.ListView):
     """ Show list of most recent posts """
     paginate_by = 15
-    queryset = Post.objects.filter(status=1).order_by('-created_on')
     template_name = 'blog_app/index.html'
 
-
-def search(request):
-    if request.method == 'GET':
-        if 'q' in request.GET and request.GET.get('q'):
-            page = request.GET.get('page', 1)
-
-            query_list = request.GET.getlist('q')
-            a = [key for key in request.GET]
-            print(a)
-            print(query_list)
-            qs = [Q(title__icontains=keyword) | Q(tags__tagline__icontains=keyword) for keyword in query_list]
-            print(qs)
-            query = qs.pop()  # get the first element
-
-            for q in qs:
-                query |= q
-            posts = Post.objects.filter(query, status=1)
-            # posts = Post.objects.filter(
-            #     Q(title__icontains=query) | Q(tags__tagline__icontains=query), status=1
-            # ).distinct().order_by('-created_on')
-            # posts = Post.objects.filter(
-            #     title__icontains=query, tags__tagline__icontains=query, status=1
-            # ).order_by('-created_on')
-            # posts = Post.objects.annotate(
-            #     search=SearchVector('title'),
-            # ).filter(search__icontains=query, status=1)
-            paginator = Paginator(posts, 10)
-            posts = paginator.page(page)
-
-            return render(request, 'blog_app/search.html',
-                          {'post_list': posts, 'query': '&q='.join(query_list)})
-        return render(request, 'blog_app/search.html')
-
-
-# class PostListSearch(generic.ListView):
-#     """ Show list of post that match search query """
-#     paginate_by = 5
-#     # queryset = Post.objects.filter(status=1).order_by('-created_on')[:10]
-#     template_name = 'blog_app/search.html'
-#
-#     def get_queryset(self, **kwargs):
-#         query = self.request.GET.get('q')
-#         return Post.objects.filter(
-#             title__icontains=query,
-#             status=1
-#         )
-#         # return Post.objects.annotate(
-#         #     search=SearchVector('title', ),
-#         # ).filter(search=query)
-
-
-# def post_detail(request, slug):
-#     template_name = 'blog_app/post_detail.html'
-#     post = get_object_or_404(Post, slug=slug, status=1)
-#     comments = post.comments.filter(active=True)
-#
-#     # Comment posted
-#     if request.method == 'POST':
-#         print(request.POST)
-#         comment_form = CommentForm(data=request.POST)
-#         print(comment_form.data)
-#         if comment_form.is_valid():
-#             # Create Comment object but don't save to database yet
-#             new_comment = comment_form.save(commit=False)
-#
-#             # Assign the current post adn author to the comment
-#             new_comment.post = post
-#             new_comment.author = request.user
-#
-#             # Save the comment to the database
-#             new_comment.save()
-#
-#         # request.session['message'] = 'Your previous comment is awaiting moderation'
-#
-#         return HttpResponseRedirect(reverse('blog_app:post_detail', kwargs={'slug': slug}))
-#     else:
-#         # if request.COOKIES["postToken"] == 'allow':
-#         #     comment_form = CommentForm()
-#         # else:
-#         #     setting_cookies = 'allow'
-#         if request.user.is_authenticated:
-#             comment_form = CommentForm()
-#         else:
-#             comment_form = None
-#
-#     response = render(request, template_name, {'post': post,
-#                                                'comments': comments,
-#                                                'comment_form': comment_form})
-#
-#     # response.set_cookie("postToken", value=setting_cookies)
-#
-#     return response
-
-
-class PostLikeToggle(RedirectView):
-    def get_redirect_url(self, *args, **kwargs):
-        slug = self.kwargs.get("slug")
-        obj = get_object_or_404(Post, slug=slug)
-        url_ = obj.get_absolute_url()
-        user = self.request.user
-        if user.is_authenticated:
-            if user in obj.likes.all():
-                obj.likes.remove(user)
-            else:
-                obj.likes.add(user)
-        return url_
-
-
-class PostReportToggle(RedirectView):
-    def get_redirect_url(self, *args, **kwargs):
-        slug = self.kwargs.get("slug")
-        post = get_object_or_404(Post, slug=slug)
-        url_ = post.get_absolute_url()
-        user = self.request.user
-        if user.is_authenticated:
-            if ReportPost.objects.filter(post=post).exists():
-                report = ReportPost.objects.get(post=post)
-                if not report.reports.filter(username=user.username).exists():
-                    report.total_reports += 1
-                    report.reports.add(user)
-                    report.save()
-            else:
-                report = ReportPost.objects.create(post=post)
-                report.total_reports += 1
-                report.reports.add(user)
-                report.save()
-        return url_
-
-
-class CommentReportToggle(RedirectView):
-    def get_redirect_url(self, *args, **kwargs):
-        id = self.kwargs.get("id")
-        comment = Comment.objects.get(id=id)
-
-        slug = self.kwargs.get("slug")
-        post = Post.objects.get(slug=slug)
-        url_ = post.get_absolute_url()
-
-        user = self.request.user
-        if user.is_authenticated:
-            if ReportComment.objects.filter(comment=comment).exists():
-                report = ReportComment.objects.get(comment=comment)
-                if not report.reports.filter(username=user.username).exists():
-                    report.total_reports += 1
-                    report.reports.add(user)
-                    report.save()
-            else:
-                report = ReportComment.objects.create(comment=comment)
-                report.total_reports += 1
-                report.reports.add(user)
-                report.save()
-        return url_
+    def get_queryset(self, **kwargs):
+        query = self.request.GET.get('q', None)
+        if query:
+            q = Post.objects.filter(
+                title__icontains=query,
+                status=1
+            ).order_by('-created_on')
+        else:
+            q = Post.objects.all()
+        return q
 
 
 class PostDetail(HitCountDetailView):
@@ -251,9 +105,6 @@ class PostDetail(HitCountDetailView):
 def create_new_post(request):
     """ Create form to add new post """
     if request.method == 'POST':
-        print('Files - ', request.FILES)
-        print('Req - ', request)
-        print('POST data - ', request.POST)
         form = NewPostForm(request.POST, request.FILES)
         if form.is_valid():
             new_post = Post()
@@ -276,8 +127,6 @@ def create_new_post(request):
 
             new_post.save()
 
-            # image_resize(), call method directly to not to use signals
-
             for tag in form.cleaned_data['tags'].split('#'):
                 if tag:
                     new_post.tags.add(
@@ -285,6 +134,12 @@ def create_new_post(request):
                     )
 
             return HttpResponseRedirect(reverse('blog_app:home'))
+
+        context = {
+            'form': form,
+        }
+
+        return render(request, 'blog_app/new_post.html', context)
 
     # If this is a GET (or any other method) create the default form.
     else:
@@ -332,23 +187,21 @@ def edit_post(request, slug):
                 updated_post.tags.remove(*[Tag.objects.get(tagline=tag) for tag in delete_tags])
                 updated_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in add_tags])
 
-                if request.FILES:
-                    updated_post.image = form.cleaned_data['image']
-                elif form.cleaned_data['image'] is False:
-                    updated_post.image = None
-
                 updated_post.save()
 
                 return HttpResponseRedirect(reverse('blog_app:home'))
             else:
-                print('form is not valid')
+                context = {
+                    'form': form,
+                }
+
+                return render(request, 'blog_app/new_post.html', context)
 
         else:
             initial_dict = {
                 'title': old_post.title,
                 'content': old_post.content,
                 'tags': ' '.join(f'#{str(x)}' for x in old_post.tags.all()),
-                'image': old_post.image
             }
 
             form = NewPostForm(initial=initial_dict)
@@ -361,3 +214,63 @@ def edit_post(request, slug):
         context = {'author_error_message': 'You can edit only your posts'}
 
     return render(request, 'blog_app/edit_post.html', context)
+
+
+class PostLikeToggle(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        slug = self.kwargs.get("slug")
+        obj = get_object_or_404(Post, slug=slug)
+        url_ = obj.get_absolute_url()
+        user = self.request.user
+        if user.is_authenticated:
+            if user in obj.likes.all():
+                obj.likes.remove(user)
+            else:
+                obj.likes.add(user)
+        return url_
+
+
+class PostReportToggle(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        slug = self.kwargs.get("slug")
+        post = get_object_or_404(Post, slug=slug)
+        url_ = post.get_absolute_url()
+        user = self.request.user
+        if user.is_authenticated:
+            if ReportPost.objects.filter(post=post).exists():
+                report = ReportPost.objects.get(post=post)
+                if not report.reports.filter(username=user.username).exists():
+                    report.total_reports += 1
+                    report.reports.add(user)
+                    report.save()
+            else:
+                report = ReportPost.objects.create(post=post)
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+        return url_
+
+
+class CommentReportToggle(RedirectView):
+    def get_redirect_url(self, *args, **kwargs):
+        id = self.kwargs.get("id")
+        comment = Comment.objects.get(id=id)
+
+        slug = self.kwargs.get("slug")
+        post = Post.objects.get(slug=slug)
+        url_ = post.get_absolute_url()
+
+        user = self.request.user
+        if user.is_authenticated:
+            if ReportComment.objects.filter(comment=comment).exists():
+                report = ReportComment.objects.get(comment=comment)
+                if not report.reports.filter(username=user.username).exists():
+                    report.total_reports += 1
+                    report.reports.add(user)
+                    report.save()
+            else:
+                report = ReportComment.objects.create(comment=comment)
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+        return url_

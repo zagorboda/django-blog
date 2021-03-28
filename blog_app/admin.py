@@ -1,8 +1,7 @@
+from django import forms
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-
-from django import forms
 
 from ckeditor.widgets import CKEditorWidget
 
@@ -22,10 +21,9 @@ class PostAdmin(admin.ModelAdmin):
     list_display = ('title', 'author', 'slug', 'status', 'created_on', 'formatted_hit_count', 'formatted_likes')
     list_filter = ('status',)
     readonly_fields = ('formatted_hit_count', 'formatted_likes', 'author',)
-    search_fields = ('title', 'author__username', 'tags__tagline')
+    search_fields = ('title', 'author__username')
+    raw_id_fields = ('author', )
     prepopulated_fields = {'slug': ('title',)}
-    # fields = ('title', )
-    # fieldsets = None
     exclude = ('likes',)
 
     filter_horizontal = ('tags',)
@@ -55,7 +53,7 @@ class CommentAdmin(admin.ModelAdmin):
     exclude = ('post', )
 
     def approve_comments(self, request, queryset):
-        queryset.update(active=True)
+        queryset.update(status=1)
 
     def post_link(self, obj):
         return mark_safe('<a href="{}">{}</a>'.format(
