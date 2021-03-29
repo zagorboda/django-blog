@@ -1,6 +1,5 @@
 from django import forms
 from .models import Comment
-from .image_processing import check_image_size
 from ckeditor.widgets import CKEditorWidget
 
 from scripts import filter_html
