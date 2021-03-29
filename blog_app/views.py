@@ -24,15 +24,17 @@ class PostList(generic.ListView):
     template_name = 'blog_app/index.html'
 
     def get_queryset(self, **kwargs):
-        query = self.request.GET.get('q', None)
-        if query:
-            q = Post.objects.filter(
-                title__icontains=query,
-                status=1
-            ).order_by('-created_on')
+        query_list = self.request.GET.getlist('q', [])
+        if query_list:
+            qs = [Q(title__icontains=keyword) | Q(tags__tagline__icontains=keyword) for keyword in query_list]
+            query = qs.pop()
+
+            for q in qs:
+                query |= q
+            posts = Post.objects.filter(query, status=1)
         else:
-            q = Post.objects.all()
-        return q
+            posts = Post.objects.filter(status=1)
+        return posts
 
 
 class PostDetail(HitCountDetailView):

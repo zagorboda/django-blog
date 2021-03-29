@@ -85,7 +85,9 @@ class MainPageTests(TestCase):
                                     'some-text',
                                     test_user,
                                     status=0)
+
         response = self.client.get(reverse('blog_app:home'))
+
         self.assertQuerysetEqual(
             response.context['post_list'],
             []
@@ -181,7 +183,7 @@ class PostSearchTests(TestCase):
 
     def test_published_post(self):
         """ Search single published post """
-        response = self.client.get("{}{}".format(reverse('blog_app:search'), "?q=title"))
+        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q=title"))
         post_list = response.context['post_list']
 
         posts = Post.objects.filter(status=1).order_by('-created_on')
@@ -193,7 +195,7 @@ class PostSearchTests(TestCase):
 
     def test_not_existing_post(self):
         """ Search not existing post """
-        response = self.client.get("{}{}".format(reverse('blog_app:search'), "?q=not_existing_title"))
+        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q=not_existing_title"))
         post_list = response.context['post_list']
 
         self.assertQuerysetEqual(
@@ -209,7 +211,7 @@ class PostSearchTests(TestCase):
                         self.test_user,
                         status=0)
 
-        response = self.client.get("{}{}".format(reverse('blog_app:search'), "?q=draft"))
+        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q=draft"))
         post_list = response.context['post_list']
 
         self.assertQuerysetEqual(
@@ -231,7 +233,7 @@ class PostSearchTests(TestCase):
                                     self.test_user,
                                     status=1)
 
-        response = self.client.get("{}{}".format(reverse('blog_app:search'), "?q=title"))
+        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q=title"))
         post_list = response.context['post_list']
 
         posts = Post.objects.filter(status=1).order_by('-created_on')
@@ -243,7 +245,7 @@ class PostSearchTests(TestCase):
 
     def test_empty_query(self):
         """ Search with empty query """
-        response = self.client.get("{}{}".format(reverse('blog_app:search'), "?q="))
+        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q="))
         try:
             response.context['post_list']
         except Exception as e:
@@ -254,39 +256,46 @@ class PostSearchTests(TestCase):
 
     def test_published_posts_with_pagination(self):
         """ Search with number of posts greater than page size """
-        create_new_post('New title1',
-                        'Some text1',
-                        'some-text1',
-                        self.test_user,
-                        status=1)
+        for i in range(20):
+            create_new_post('New title{}'.format(i),
+                            'Some text{}'.format(i),
+                            'some-text{}'.format(i),
+                            self.test_user,
+                            status=1)
 
-        create_new_post('New title2',
-                        'Some text2',
-                        'some-text2',
-                        self.test_user,
-                        status=1)
-
-        create_new_post('New title3',
-                        'Some text3',
-                        'some-text3',
-                        self.test_user,
-                        status=1)
-
-        create_new_post('New title4',
-                        'Some text4',
-                        'some-text4',
-                        self.test_user,
-                        status=1)
-
-        response = self.client.get("{}{}".format(reverse('blog_app:search'), "?q=title"))
-
+        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q=title"))
+        paginator = response.context['paginator']
         post_list = response.context['post_list']
         result = post_list[:]
 
-        page_number = post_list.paginator.num_pages
+        for i in range(1, paginator.num_pages):
+            response = self.client.get("{}{}{}{}".format(reverse('blog_app:home'), "?q=title", "&page=", str(i+1)))
+            post_list = response.context['post_list']
 
-        for i in range(1, page_number):
-            response = self.client.get("{}{}{}{}".format(reverse('blog_app:search'), "?q=title", "&page=", str(i+1)))
+            result.extend(post_list)
+
+        posts = Post.objects.filter(status=1).order_by('-created_on')
+
+        self.assertQuerysetEqual(
+            result,
+            map(repr, posts)
+        )
+
+    def test_search_by_tags(self):
+        """ Search with number of posts greater than page size """
+        create_new_post('New title',
+                        'Some text',
+                        'some-text',
+                        self.test_user,
+                        status=1)
+
+        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q=title"))
+        paginator = response.context['paginator']
+        post_list = response.context['post_list']
+        result = post_list[:]
+
+        for i in range(1, paginator.num_pages):
+            response = self.client.get("{}{}{}{}".format(reverse('blog_app:home'), "?q=title", "&page=", str(i+1)))
             post_list = response.context['post_list']
 
             result.extend(post_list)
