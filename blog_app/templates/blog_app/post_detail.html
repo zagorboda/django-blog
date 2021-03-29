@@ -17,7 +17,7 @@
                 {%for tag in tags%}
                 <span style="padding:0.3em;">
 
-                    <a href="{%url 'blog_app:search' %}?q={{tag}}">#{{tag}}&#8203;</a>
+                    <a href="{%url 'blog_app:home' %}?q={{tag}}">#{{tag}}&#8203;</a>
                 </span>
                 {%endfor%}
             </p>
