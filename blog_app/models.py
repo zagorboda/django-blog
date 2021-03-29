@@ -1,10 +1,8 @@
 from django.db import models
-# from django.contrib.auth.models import User
 from django.urls import reverse
 from hitcount.models import HitCountMixin, HitCount
 from django.contrib.contenttypes.fields import GenericRelation
 from django.conf import settings
-# from django.utils.encoding import python_2_unicode_compatible
 
 STATUS = (
     (0, "Draft"),
@@ -33,8 +31,6 @@ class Post(models.Model, HitCountMixin):
     likes = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='post_likes')
     tags = models.ManyToManyField(Tag, blank=True)
 
-    image = models.ImageField(upload_to='images/', blank=True)
-
     def get_absolute_url(self):
         return reverse("blog_app:post_detail", kwargs={"slug": self.slug})
 
@@ -46,6 +42,9 @@ class Post(models.Model, HitCountMixin):
 
     def current_hit_count(self):
         return self.hit_count.hits
+
+    def get_parent_comments(self):
+        return Comment.objects.filter(post=self, parent=None)
 
     class Meta:
         ordering = ['-created_on']
@@ -61,11 +60,22 @@ class Comment(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     status = models.IntegerField(choices=STATUS, default=1)
 
+    parent = models.ForeignKey('self', blank=True, null=True, on_delete=models.CASCADE)
+
     class Meta:
-        ordering = ['created_on']
+        ordering = ['-created_on']
 
     def __str__(self):
         return 'Comment {}'.format(self.body)
+
+    def children(self):
+        return Comment.objects.filter(parent=self)
+
+    @property
+    def is_parent(self):
+        if self.parent is not None:
+            return False
+        return True
 
 
 class ReportPost(models.Model):

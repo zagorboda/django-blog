@@ -24,12 +24,13 @@ def create_new_user(username, password):
 def create_new_post(title, text, slug,  author, status=0):
     """ Create new post """
     date = datetime.now()
-    return Post.objects.create(title=title,
+    post = Post.objects.create(title=title,
                                slug=slug,
                                content=text,
                                author=author,
                                status=status,
                                created_on=date)
+    return post
 
 
 class MainPageTests(TestCase):
@@ -123,7 +124,7 @@ class PostDetailPageTests(TestCase):
         response = self.client.get(reverse('blog_app:post_detail', kwargs={'slug': 'some-text'}))
         self.assertEquals(response.status_code, 200)
 
-    def test_no_published_post(self):
+    def test_draft_post(self):
         """ GET request to draft post """
         test_user = create_new_user('test_user',
                                     'test_password')
@@ -132,7 +133,9 @@ class PostDetailPageTests(TestCase):
                                     'some-text',
                                     test_user,
                                     status=0)
+
         response = self.client.get(reverse('blog_app:post_detail', kwargs={'slug': 'some-text'}))
+
         self.assertEquals(response.status_code, 404)
 
 
