@@ -8,11 +8,17 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 TEMPLATES_DIRS = os.path.join(BASE_DIR, 'templates')
 
-# Get env variables
-env = environ.Env()
-environ.Env.read_env()
 
-SECRET_KEY = env("SECRET_KEY")
+env = environ.Env()
+
+if os.path.isfile('blog/.env'):
+    environ.Env.read_env(env.str('ENV_PATH', 'blog/.env'))
+else:
+    environ.Env.read_env(env.str('ENV_PATH', 'blog/.env.example'))
+
+# environ.Env.read_env(env.str('ENV_PATH', 'blog/.env'))
+
+SECRET_KEY = env("SECRET_KEY", default='0x!b#(1*cd73w$&azzc6p+essg7v=g80ls#z&xcx*mpemx&@9$') # return fake key if no single in env
 
 DEBUG = True
 
@@ -73,17 +79,15 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'blog.wsgi.application'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': env("DATABASE_NAME"),
-        'USER': env("DATABASE_USER"),
-        'PASSWORD': env("DATABASE_PASSWORD"),
-        'HOST': env("DATABASE_HOST"),
-        'PORT': env("DATABASE_PORT"),
-        'TEST': {
-            'NAME': env("TEST_DATABASE_NAME"),
-        }
+        'NAME': env('DOCKER_DATABASE_NAME', default=None) or env('DATABASE_NAME'),
+        'USER': env('DOCKER_DATABASE_USER', default=None) or env('DATABASE_USER'),
+        'PASSWORD': env('DOCKER_DATABASE_PASSWORD', default=None) or env('DATABASE_PASSWORD'),
+        'HOST': env('DOCKER_DATABASE_HOST', default=None) or env('DATABASE_HOST'),
+        'PORT': env('DOCKER_DATABASE_PORT', default=None) or env('DATABASE_PORT'),
     }
 }
 
@@ -233,44 +237,44 @@ CKEDITOR_CONFIGS = {
     }
 }
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': ('%(asctime)s [%(process)d] [%(levelname)s] '
-                       'pathname=%(pathname)s lineno=%(lineno)s '
-                       'funcname=%(funcName)s %(message)s'),
-            'datefmt': '%Y-%m-%d %H:%M:%S'
-        },
-        'simple': {
-            'format': '%(levelname)s %(message)s'
-        }
-    },
-    'handlers': {
-        'null': {
-            'level': 'DEBUG',
-            'class': 'logging.NullHandler',
-        },
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
-        }
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'django.request': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-    }
-}
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'formatters': {
+#         'verbose': {
+#             'format': ('%(asctime)s [%(process)d] [%(levelname)s] '
+#                        'pathname=%(pathname)s lineno=%(lineno)s '
+#                        'funcname=%(funcName)s %(message)s'),
+#             'datefmt': '%Y-%m-%d %H:%M:%S'
+#         },
+#         'simple': {
+#             'format': '%(levelname)s %(message)s'
+#         }
+#     },
+#     'handlers': {
+#         'null': {
+#             'level': 'DEBUG',
+#             'class': 'logging.NullHandler',
+#         },
+#         'console': {
+#             'level': 'INFO',
+#             'class': 'logging.StreamHandler',
+#             'formatter': 'verbose'
+#         }
+#     },
+#     'loggers': {
+#         'django': {
+#             'handlers': ['console'],
+#             'level': 'DEBUG',
+#             'propagate': True,
+#         },
+#         'django.request': {
+#             'handlers': ['console'],
+#             'level': 'DEBUG',
+#             'propagate': False,
+#         },
+#     }
+# }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),

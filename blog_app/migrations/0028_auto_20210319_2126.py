@@ -15,10 +15,6 @@ class Migration(migrations.Migration):
             name='comment',
             options={'ordering': ['-created_on']},
         ),
-        migrations.RemoveField(
-            model_name='post',
-            name='image',
-        ),
         migrations.AddField(
             model_name='comment',
             name='parent',
