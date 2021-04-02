@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 # from django.contrib.auth import login
 # from django.test import Client
 
-from .models import Post
+from .models import Post, Tag
 
 from datetime import datetime
 
@@ -171,6 +171,7 @@ class NewPostPageTests(TestCase):
 
 
 class PostSearchTests(TestCase):
+
     def setUp(self):
         self.test_user = create_new_user('test_user',
                                          'test_password')
@@ -282,25 +283,28 @@ class PostSearchTests(TestCase):
         )
 
     def test_search_by_tags(self):
-        """ Search with number of posts greater than page size """
-        create_new_post('New title',
-                        'Some text',
-                        'some-text',
-                        self.test_user,
-                        status=1)
+        test_tag = Tag.objects.create(tagline='sport')
 
-        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q=title"))
+        for i in range(20):
+            new_post = create_new_post('New title{}'.format(i),
+                            'Some text{}'.format(i),
+                            'some-text{}'.format(i),
+                            self.test_user,
+                            status=1)
+            new_post.tags.add(test_tag)
+
+        response = self.client.get("{}{}".format(reverse('blog_app:home'), "?q=sport"))
         paginator = response.context['paginator']
         post_list = response.context['post_list']
         result = post_list[:]
 
         for i in range(1, paginator.num_pages):
-            response = self.client.get("{}{}{}{}".format(reverse('blog_app:home'), "?q=title", "&page=", str(i+1)))
+            response = self.client.get("{}{}{}{}".format(reverse('blog_app:home'), "?q=sport", "&page=", str(i+1)))
             post_list = response.context['post_list']
 
             result.extend(post_list)
 
-        posts = Post.objects.filter(status=1).order_by('-created_on')
+        posts = Post.objects.filter(status=1, tags__tagline='sport').order_by('-created_on')
 
         self.assertQuerysetEqual(
             result,
