@@ -10,8 +10,8 @@ services:
     volumes:
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     expose:
-      - "5433" # Publishes 5433 to other containers but NOT to host machine
-    command: -p 5433
+      - "5434" # Publishes specific port to other containers but NOT to host machine
+    command: -p 5434
 
   web:
     build:

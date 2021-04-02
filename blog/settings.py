@@ -1,7 +1,7 @@
-import os
 from datetime import timedelta
-
 import environ
+import logging.config
+import os
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,13 +16,15 @@ if os.path.isfile('blog/.env'):
 else:
     environ.Env.read_env(env.str('ENV_PATH', 'blog/.env.example'))
 
-# environ.Env.read_env(env.str('ENV_PATH', 'blog/.env'))
+# environ.Env.read_env(env.str('ENV_PATH', 'blog/.env.example'))
 
 SECRET_KEY = env("SECRET_KEY", default='0x!b#(1*cd73w$&azzc6p+essg7v=g80ls#z&xcx*mpemx&@9$') # return fake key if no single in env
 
 DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver', '.herokuapp.com', '0.0.0.0']
+
+ADMINS = []
 
 INSTALLED_APPS = [
 
@@ -79,6 +81,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'blog.wsgi.application'
+
 
 DATABASES = {
     'default': {
@@ -237,45 +240,6 @@ CKEDITOR_CONFIGS = {
     }
 }
 
-# LOGGING = {
-#     'version': 1,
-#     'disable_existing_loggers': False,
-#     'formatters': {
-#         'verbose': {
-#             'format': ('%(asctime)s [%(process)d] [%(levelname)s] '
-#                        'pathname=%(pathname)s lineno=%(lineno)s '
-#                        'funcname=%(funcName)s %(message)s'),
-#             'datefmt': '%Y-%m-%d %H:%M:%S'
-#         },
-#         'simple': {
-#             'format': '%(levelname)s %(message)s'
-#         }
-#     },
-#     'handlers': {
-#         'null': {
-#             'level': 'DEBUG',
-#             'class': 'logging.NullHandler',
-#         },
-#         'console': {
-#             'level': 'INFO',
-#             'class': 'logging.StreamHandler',
-#             'formatter': 'verbose'
-#         }
-#     },
-#     'loggers': {
-#         'django': {
-#             'handlers': ['console'],
-#             'level': 'DEBUG',
-#             'propagate': True,
-#         },
-#         'django.request': {
-#             'handlers': ['console'],
-#             'level': 'DEBUG',
-#             'propagate': False,
-#         },
-#     }
-# }
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -297,3 +261,52 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
 
+
+if env('DOCKER_DATABASE_NAME', default=None):
+    logfile = 'logs/docker_log.log'
+else:
+    logfile = 'logs/python_log.log'
+
+LOGGING_CONFIG = None
+logging.config.dictConfig({
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+        },
+        'verbose': {
+            'format': ('%(asctime)s [%(process)d] [%(levelname)s] '
+                       'pathname=%(pathname)s lineno=%(lineno)s '
+                       'funcname=%(funcName)s %(message)s'),
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        }
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        }
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, logfile),
+            'formatter': 'verbose'
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler'
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['file', 'mail_admins'],
+            'propagate': True,
+            'level': 'INFO',
+        },
+    },
+})
