@@ -4,32 +4,28 @@ from django.core.mail import EmailMessage
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
-from django.utils.crypto import get_random_string
 from django.utils.encoding import force_bytes, force_text
-# from django.utils.html import strip_tags
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.text import slugify
 
 from rest_framework import generics, status, permissions, pagination, filters
-from rest_framework.decorators import api_view
-from rest_framework.exceptions import ValidationError
-from rest_framework.generics import GenericAPIView
+from rest_framework.decorators import api_view, permission_classes
 # from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
+from rest_framework.exceptions import ParseError
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
-# from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from blog_app.models import Post, Comment, Tag, ReportPost, ReportComment
-from .serializers import UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer,\
-    RegisterUserSerializer, ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer, \
-    EditProfileSerializer
+from .permissions import IsOwnerOrReadOnly, IsOwnerOrIsAuthenticatedOrReadOnly
+from .serializers import (
+    UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterUserSerializer,
+    ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer, EditProfileSerializer
+)
 
 from datetime import datetime
-
-import json
 
 from hitcount.views import HitCountDetailView, HitCountMixin
 from hitcount.models import HitCount
@@ -38,23 +34,28 @@ from rest_framework_swagger.views import get_swagger_view
 
 from .tokens import account_activation_token, password_reset_token
 
-schema_view = get_swagger_view(title='Blog API')
+
+@permission_classes((AllowAny,))
+def schema_view():
+    return get_swagger_view(title='Blog API')
 
 
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({
         'blog': reverse('api:blog_main_page', request=request, format=format),
-        'user': reverse('api:schema', request=request, format=format),
         'schema': reverse('api:schema', request=request, format=format),
     })
 
 
-class CustomPagination(pagination.PageNumberPagination):
-    """ Custom pagination for posts """
+class PostListPagination(pagination.PageNumberPagination):
+    """
+    Custom pagination for posts
+    """
     page = 1
     page_size = 15
     page_size_query_param = 'page_size'
+    max_page_size = 50
 
     def get_paginated_response(self, data):
         response_data = {
@@ -74,9 +75,6 @@ class CustomPagination(pagination.PageNumberPagination):
             response_data['create_new_post_url'] = self.request.build_absolute_uri(
                 reverse('api:new-post')
             )
-            response_data['change_password'] = self.request.build_absolute_uri(
-                reverse('api:change_password')
-            )
         else:
             response_data['reset_password'] = self.request.build_absolute_uri(
                 reverse('api:email_reset_password')
@@ -93,330 +91,300 @@ class CustomPagination(pagination.PageNumberPagination):
         return Response(response_data)
 
 
-class PostDetail(GenericAPIView):
-    """ Return all information about post.
+class CustomPageNumberPagination(pagination.PageNumberPagination):
+    """
+    Custom number pagination
+    """
+    page_size = 10
+    max_page_size = 50
+    page_size_query_param = 'page_size'
+
+    def get_paginated_response(self, data):
+        return Response({
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'count': self.page.paginator.count,
+            'limit': self.page_size,
+            'results': data
+        })
+
+
+class PostDetail(APIView):
+    """
+    Return detail information about blogpost.
 
     GET : return information.
-    POST : add new comment (user must be logged in, requires comment body).
+    PATCH : edit blogpost.
     """
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = (IsOwnerOrReadOnly, )
 
     def get_object(self, *args, **kwargs):
         """ Return object or 404 """
 
         try:
-            return Post.objects.get(slug=args[0], status=1)
+            post = Post.objects.get(slug=args[0], status=1)
+            self.check_object_permissions(self.request, post)
+            return post
         except Post.DoesNotExist:
             raise Http404
 
-    def get(self, request, slug, format=None):
-        """ Return detail post information """
+    def get(self, request, slug):
+        """ Return detail blogpost information """
 
-        queryset = self.get_object(slug)
-        serializer = PostDetailSerializer(queryset, context={'request': request})
+        post = self.get_object(slug)
+        serializer = PostDetailSerializer(post, context={'request': request})
 
-        hit_count = HitCount.objects.get_for_object(queryset)
+        hit_count = HitCount.objects.get_for_object(post)
         hit_count_response = HitCountMixin.hit_count(request, hit_count)
 
         return Response(serializer.data)
 
-    def post(self, request, slug, format=None):
-        """Add new comment to post"""
+    def patch(self, request, slug):
+        """ Edit blogpost fields """
 
-        serializer = CommentSerializer(data=request.data, context={'request': request})
+        post = self.get_object(slug)
+        data = request.data.copy()
+
+        serializer = PostDetailSerializer(post, data=data, context={'request': request}, partial=True)
         if serializer.is_valid():
-            post = self.get_object(slug)
-            serializer.save(author=self.request.user, created_on=datetime.now(), post=post)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            serializer.save()
+
+            return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def get_serializer_class(self):
-        """ Return serializer class for different requests """
-        if self.request.method == 'GET':
-            return PostDetailSerializer
-        if self.request.method == 'POST':
-            return CommentSerializer
-        return PostDetailSerializer
 
+class UserDetail(APIView):
+    """
+    Return user information.
 
-class PostLikeAPIToggle(APIView):
-    """ View to like/unlike post """
-    # authentication_classes = (authentication.SessionAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def get(self, request, slug, format=None):
-        # slug = self.kwargs.get("slug")
-        obj = get_object_or_404(Post, slug=slug)
-        # url_ = obj.get_absolute_url()
-        user = self.request.user
-        updated = False
-        liked = False
-        if user.is_authenticated:
-            if user in obj.likes.all():
-                liked = False
-                obj.likes.remove(user)
-            else:
-                liked = True
-                obj.likes.add(user)
-            updated = True
-        data = {
-            "updated": updated,
-            "liked": liked
-        }
-        return Response(data)
-
-
-class PostReportToggle(APIView):
-    """ View to report post """
-    def get(self, *args, **kwargs):
-        slug = self.kwargs.get("slug")
-        post = get_object_or_404(Post, slug=slug)
-        url_ = post.get_absolute_url()
-        user = self.request.user
-        result = {}
-        if user.is_authenticated:
-            if ReportPost.objects.filter(post=post).exists():
-                report = ReportPost.objects.get(post=post)
-                if not report.reports.filter(username=user.username).exists():
-                    report.total_reports += 1
-                    report.reports.add(user)
-                    report.save()
-                    data = {'updated': True}
-                else:
-                    data = {'updated': False, 'message': 'Post already reported'}
-            else:
-                report = ReportPost.objects.create(post=post)
-                report.total_reports += 1
-                report.reports.add(user)
-                report.save()
-                data = {'updated': True}
-        else:
-            data = {'message': 'You are not authenticated'}
-        return Response(data)
-
-
-class CommentReportToggle(APIView):
-    """ View to report comment """
-    def get(self, *args, **kwargs):
-        id = self.kwargs.get("id")
-        comment = Comment.objects.get(id=id)
-
-        slug = self.kwargs.get("slug")
-        post = Post.objects.get(slug=slug)
-        url_ = post.get_absolute_url()
-
-        user = self.request.user
-        if user.is_authenticated:
-            if ReportComment.objects.filter(comment=comment).exists():
-                report = ReportComment.objects.get(comment=comment)
-                if not report.reports.filter(username=user.username).exists():
-                    report.total_reports += 1
-                    report.reports.add(user)
-                    report.save()
-                    data = {'updated': True}
-                else:
-                    data = {'updated': False, 'message': 'Comment already reported'}
-            else:
-                report = ReportComment.objects.create(comment=comment)
-                report.total_reports += 1
-                report.reports.add(user)
-                report.save()
-                data = {'updated': True}
-        else:
-            data = {'message': 'You are not authenticated'}
-        return Response(data)
-
-
-# class UserList(generics.ListAPIView):
-#     User = get_user_model()
-#     queryset = User.objects.all()
-#     serializer_class = UserSerializer
-
-
-class UserDetail(generics.RetrieveAPIView):
-    """ Return information about user """
-    # User = get_user_model()
-    # queryset = User.objects.all()
-    # serializer_class = UserSerializer
-
-    query_set_name = 'user_profile'
+    GET: return user information.
+    PATCH: edit user information(
+        fields: bio,
+    ).
+    """
+    permission_classes = (IsOwnerOrReadOnly, )
 
     lookup_field = 'username'
 
-    def get(self, request, username, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
+        """
+        Retrieve user information
+        """
+        username = kwargs.get('username')
         User = get_user_model()
         try:
             queryset = User.objects.get(username=username)
         except User.DoesNotExist:
             raise Http404
 
-        serializer = UserSerializer(queryset, context={'request': request})
-
+        serializer = UserSerializer(queryset, context={'request': request, 'kwargs': kwargs})
         return Response(serializer.data)
+
+    def patch(self, request, *args, **kwargs):
+        """
+        Edit user information
+        """
+        request_user = request.user
+        username = kwargs.get('username')
+
+        User = get_user_model()
+        if not User.objects.filter(username=username).exists():
+            raise Http404
+        user = User.objects.get(username=username)
+
+        if request_user.id == user.id:
+            serializer = EditProfileSerializer(request_user, data=request.data, context={'request': request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors)
+        return Response(status=status.HTTP_403_FORBIDDEN)
+
+
+class UserObjects(generics.ListAPIView):
+    """
+    Return list of user related objects (blogposts, comments).
+    """
+
+    pagination_class = CustomPageNumberPagination
+
+    def get_serializer_class(self):
+        """
+        Determine serializer for different object type.
+        """
+
+        object_type = self.kwargs.get('object_type', 'posts')
+        if object_type == 'comments':
+            return CommentSerializer
+        return PostListSerializer
+
+    def get_queryset(self):
+        """
+        Determine queryset for different object type.
+        """
+
+        object_type = self.kwargs.get('object_type', 'posts')
+        username = self.kwargs.get('username', None)
+        User = get_user_model()
+        if not User.objects.filter(username=username).exists():
+            raise Http404
+        user = User.objects.get(username=username)
+
+        paginator = pagination.PageNumberPagination()
+        paginator.page_size = 5
+
+        if user.id == self.request.user.id:
+            objects_status = (0, 1)
+        else:
+            objects_status = (1, )
+
+        if object_type == 'posts':
+            query = Post.objects.all().filter(author=user, status__in=objects_status)
+        elif object_type == 'comments':
+            query = Comment.objects.filter(author=user, status__in=objects_status)
+        else:
+            raise ParseError(detail="Invalid object type")
+
+        result_page = paginator.paginate_queryset(query, self.request)
+        return result_page
+
+
+class PostComments(generics.ListCreateAPIView):
+    """
+    Return list of blogpost related comments.
+    """
+
+    pagination_class = CustomPageNumberPagination
+    serializer_class = CommentSerializer
+
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly, )
+
+    def get_queryset(self):
+        slug = self.kwargs.get('slug', None)
+        if slug is None or not Post.objects.filter(slug=slug).exists():
+            raise Http404
+
+        post = Post.objects.get(slug=slug)
+
+        comments = Comment.objects.filter(post=post, status=1, parent=None)
+        return comments
+
+    def post(self, request, *args, **kwargs):
+        """
+        Add new comment to blogpost
+        """
+        slug = kwargs.get('slug')
+        serializer = CommentSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            if Post.objects.filter(slug=slug).exists():
+                post = Post.objects.get(slug=slug)
+            else:
+                raise Http404
+            serializer.save(author=self.request.user, created_on=datetime.now(), post=post)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CommentDetail(generics.RetrieveAPIView):
+    """
+    Retrieve detail comment information.
+
+    Require post slug and comment id.
+    """
+
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+
+    lookup_field = 'id'
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+
+class ChildrenComments(generics.ListAPIView):
+    """
+    Return list of children comments related to some parent comment.
+    """
+
+    pagination_class = CustomPageNumberPagination
+    serializer_class = CommentSerializer
+
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        slug = self.kwargs.get('slug', None)
+        parent_id = self.kwargs.get('id', None)
+
+        if slug is None or not Post.objects.filter(slug=slug).exists():
+            raise Http404('Post with this slug does not exists')
+
+        if parent_id is None or not Comment.objects.filter(id=parent_id).exists():
+            raise Http404('Comment with this id does not exists')
+
+        parent_comment = Comment.objects.get(id=parent_id)
+
+        comments = Comment.objects.filter(status=1, parent=parent_comment)
+        return comments
 
 
 class BlogMainPage(generics.ListAPIView):
     """ Return most recent posts """
+
     queryset = Post.objects.all().filter(status=1)
     serializer_class = PostListSerializer
 
-    pagination_class = CustomPagination
+    pagination_class = PostListPagination
 
     filter_backends = (filters.SearchFilter,)
     search_fields = ('title', 'tags__tagline')
 
-    # filter_backends = (DynamicSearchFilter,)
-
-
-class EditPost(APIView):
-    """ Edit existing post """
-    # permission_classes = (IsOwnerOrReadOnly, )
-
-    def get_object(self, slug):
-        """ Return object or 404 """
-        try:
-            return Post.objects.get(slug=slug)
-        except Post.DoesNotExist:
-            raise Http404
-
-    def get(self, request, slug, format=None):
-        """ Return detail post information """
-
-        post = self.get_object(slug)
-        if self.request.user.is_authenticated and self.request.user.id == post.author.id:
-            serializer = PostDetailSerializer(post, context={'request': request})
-            return Response(serializer.data)
-        return Response({'detail': "You don't have permission to edit this post"},
-                        status=status.HTTP_401_UNAUTHORIZED)
-
-    # Title and content not empty, check this on client side
-    def patch(self, request, slug, format=None):
-        """ Edit post fields """
-        post = self.get_object(slug)
-        if self.request.user.is_authenticated and self.request.user.id == post.author.id:
-            data = request.data.copy()
-            if 'title' in data:
-                data['slug'] = slugify('{}-{}-{}'.format(
-                    request.data['title'],
-                    request.user.username,
-                    post.created_on.strftime('%Y-%m-%d'))
-                )
-                while Post.objects.filter(slug=slug).exists():
-                    slug = '{}-{}'.format(slug, get_random_string(length=2))
-                data['slug'] = slug
-            else:
-                data['slug'] = post.slug
-                data['title'] = post.title
-            if 'content' not in request.data:
-                data['content'] = post.content
-            data['updated_on'] = datetime.now()
-            data['status'] = 0
-
-            tags_in_request = False
-            if 'tags' in data:
-                request_tags = data.getlist('tags')
-                del data['tags']
-                tags_in_request = True
-            if 'image_changed' in data:
-                # if 'image' in data:
-                if data['image'] == 'deleted':
-                    data['image'] = None
-            else:
-                if post.image:
-                    data['image'] = post.image
-
-            serializer = PostDetailSerializer(post, data=data, context={'request': request})
-            if serializer.is_valid():
-                serializer.save()
-                updated_post = self.get_object(slug)
-
-                if tags_in_request:
-                    old_tags = [str(tag) for tag in post.tags.all()]
-                    new_tags = list(filter(None, request_tags))
-                    delete_tags = list(set(old_tags) - set(new_tags))
-                    add_tags = list(set(new_tags) - set(old_tags))
-
-                    updated_post.tags.remove(*[Tag.objects.get(tagline=tag) for tag in delete_tags])
-                    updated_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in add_tags])
-
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'detail': "You don't have permission to edit this post"}, status=status.HTTP_401_UNAUTHORIZED)
-
 
 class CreateNewPost(APIView):
-    """ Create new post.
+    """ Create new blogpost.
+    User must be logged in.
+    Required fields : title, content(HTML markup).
+    Optional fields: tags(list of items).
+    Return created blogpost information.
 
-    POST : usr must be logged in.
-    Requires : title, content, body.
-    Additional fields: tags(list of items).
+    Example:
+        {
+        "title": "Some title",
+        "content": "Some html markdown from WYSIWYG",
+        "tags": [
+            {"tagline": "sport"},
+            {"tagline": "music"}
+        ]
+        }
     """
     serializer_class = PostDetailSerializer
-    # parser_class = (MultiPartParser,)
-    # parser_classes = [gen_MultipartJsonParser(['title', 'content'])]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = (permissions.IsAuthenticated, )
 
-    def get(self, request):
-        return Response()
-        # return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED) # TODO
+    def get(self):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def post(self, request):
-        """ Create new object """
-        if request.content_type.startswith('multipart/form-data'):
-            # as user can upload image, content-type must be multipart/form-data
-            # tags must be array of strings
-            required_fields = ('title', 'content')
-            validation_errors = dict()
+        """ Create new blogpost """
 
-            if request.data:
-                data = request.data.copy()
-            else:
-                data = json.loads(request.body)
+        data = request.data.copy()
 
-            for field in required_fields:
-                if field not in data:
-                    validation_errors[field] = ['This field may not be blank.']
-            if validation_errors:
-                raise ValidationError(validation_errors)
+        serializer = PostDetailSerializer(data=data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
 
-            slug = slugify('{}-{}-{}'.format(
-                data['title'],
-                request.user.username,
-                datetime.now().strftime('%Y-%m-%d'))
-            )
-            while Post.objects.filter(slug=slug).exists():
-                slug = '{}-{}'.format(slug, get_random_string(length=2))
-            data['slug'] = slug
-
-            tags_in_request = False
-            if 'tags' in data:
-                request_tags = data.getlist('tags')
-                del data['tags']
-                tags_in_request = True
-
-            serializer = PostDetailSerializer(data=data, context={'request': request})
-            if serializer.is_valid():
-                serializer.save(
-                    created_on=datetime.now(),
-                    status=0,
-                    author=self.request.user
-                )
-
-                created_post = get_object_or_404(Post, slug=slug)
-
-                if tags_in_request:
-                    created_post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in request_tags])
-
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"detail": "Incorrect content-type"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserCreateApiView(APIView):
-    """ Create new user
+    """
+    Create new user.
 
     POST : create new user.
-    Requires : username(unique), email(unique), password"""
+    Required fields : username(unique), email(unique), password.
+    Return nothing, send confirmation to user email.
+    """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -443,7 +411,10 @@ class UserCreateApiView(APIView):
 
 
 class ConfirmEmail(APIView):
-    """ Confirm user email and activate account """
+    """
+    Confirm user email and activate account
+    """
+
     def get(self, request, uidb64, token):
         User = get_user_model()
         try:
@@ -460,28 +431,32 @@ class ConfirmEmail(APIView):
 
 
 class ChangePassword(APIView):
-    """ Endpoint to change user password
+    """
+    Change user password
 
     Patch:
-        old_password - user old password
-        new_password1 - new user password
-        new_password2 - new user password
+    Required fields: old_password, new_password1, new_password2
     """
+
     permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request, *args, **kwargs):
         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        # TODO: blacklist and generate new JWT token ?delete token on client side?
         return Response(status=status.HTTP_200_OK)
 
 
 class ResetPasswordEmail(APIView):
-    """ Send password reset email to user """
+    """
+    Send password reset email to user
+
+    Post: send email.
+    Required fields: email.
+    """
 
     def post(self, request):
-        """ Send email to user email """
+        """ Send password reset email to user """
         serializer = ResetPasswordEmailSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data.get('email')
@@ -510,7 +485,9 @@ class ResetPasswordEmail(APIView):
 
 
 class ResetPassword(APIView):
-    """ Receive and update user password """
+    """
+    Reset user password using token from email.
+    """
 
     def patch(self, request, uidb64, token):
         serializer = ResetPasswordSerializer(data=request.data,
@@ -521,25 +498,10 @@ class ResetPassword(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-class EditProfile(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        serializer = EditProfileSerializer(request.user, context={'request': request})
-        return Response(serializer.data)
-
-    def patch(self, request):
-        user = request.user
-
-        serializer = EditProfileSerializer(user, data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors)
-
-
 class BlacklistTokenView(APIView):
-    """ Blacklist JWT token """
+    """
+    Blacklist JWT token
+    """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -549,3 +511,90 @@ class BlacklistTokenView(APIView):
             token.blacklist()
         except Exception as e:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class PostLikeAPIToggle(APIView):
+    """
+    Endpoint to like/unlike post
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, slug):
+        obj = get_object_or_404(Post, slug=slug)
+        user = request.user
+        updated = False
+        liked = False
+        if user.is_authenticated:
+            if user in obj.likes.all():
+                liked = False
+                obj.likes.remove(user)
+            else:
+                liked = True
+                obj.likes.add(user)
+            updated = True
+        data = {
+            "updated": updated,
+            "liked": liked
+        }
+        return Response(data)
+
+
+class PostReportToggle(APIView):
+    """
+    Endpoint to report post
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, *args, **kwargs):
+        slug = self.kwargs.get("slug")
+        post = get_object_or_404(Post, slug=slug)
+        user = self.request.user
+
+        if ReportPost.objects.filter(post=post).exists():
+            report = ReportPost.objects.get(post=post)
+            if not report.reports.filter(username=user.username).exists():
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+                data = {'updated': True}
+            else:
+                data = {'updated': False, 'message': 'Post already reported'}
+        else:
+            report = ReportPost.objects.create(post=post)
+            report.total_reports += 1
+            report.reports.add(user)
+            report.save()
+            data = {'updated': True}
+        return Response(data)
+
+
+class CommentReportToggle(APIView):
+    """
+    Endpoint to report comment
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, *args, **kwargs):
+        id = self.kwargs.get("id")
+        comment = Comment.objects.get(id=id)
+        user = self.request.user
+
+        if ReportComment.objects.filter(comment=comment).exists():
+            report = ReportComment.objects.get(comment=comment)
+            if not report.reports.filter(username=user.username).exists():
+                report.total_reports += 1
+                report.reports.add(user)
+                report.save()
+                data = {'updated': True}
+            else:
+                data = {'updated': False, 'message': 'Comment already reported'}
+        else:
+            report = ReportComment.objects.create(comment=comment)
+            report.total_reports += 1
+            report.reports.add(user)
+            report.save()
+            data = {'updated': True}
+        return Response(data)

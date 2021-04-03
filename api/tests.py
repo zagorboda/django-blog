@@ -232,21 +232,14 @@ class PostDetailTest(TestCase):
         )
 
         factory = RequestFactory()
-        # factory.login(username=self.user1, password=self.password1)
-        # factory.credentials(HTTP_AUTHORIZATION='Token {}'.format(self.token1))
 
         request = factory.get(
             reverse('api:post-detail', kwargs={'slug': 'slug'})
         )
         test_request = Request(request)
 
-        # response.data['url'] = response.data['url'][17:]
-        # response.data['edit_url'] = response.data['edit_url'][17:]
-        # response.data['author'] = response.data['author'][17:]
-        # response.data['like_url'] = response.data['like_url'][17:]
-
         post = Post.objects.get(slug='slug')
-        serializer = PostDetailSerializer(post, context={'request': test_request})  # response.wsgi_request
+        serializer = PostDetailSerializer(post, context={'request': test_request})
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -266,30 +259,30 @@ class PostDetailTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_post_request_post_detail(self):
-        """ Make POST request (create new comment) to post detail page by unauthorized user"""
+        """ Make POST request (create new comment) to post comments page by unauthorized user"""
         client = Client()
-        response = client.post(reverse('api:post-detail', kwargs={'slug': 'slug'}))
+        response = client.post(reverse('api:post-comments', kwargs={'slug': 'slug'}))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_comment_post_detail(self):
-        """ Make POST request (create new comment) to post detail page by authorized user"""
+        """ Make POST request (create new comment) to post comments page by authorized user"""
         client = Client()
 
-        # client.login(username=self.test_user.username, password=self.test_password)
-        # token = Token.objects.create(user=self.test_user)
-
         response = client.post(
-            reverse('api:post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-comments', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.test_auth_token),
             data=json.dumps({'body': "test"}),
             content_type='application/json'
         )
 
         response.data['author'] = response.data['author'][17:]
+        response.data['report_url'] = response.data['report_url'][17:]
+        response.data['post_url'] = response.data['post_url'][17:]
+        response.data['url'] = response.data['url'][17:]
 
         comment = Comment.objects.get(post=self.post1)
-        serializer = CommentSerializer(comment, context={'request': None})  # request None?
+        serializer = CommentSerializer(comment, context={'request': None})
 
         number_of_comments = Comment.objects.all().count()
 
@@ -301,11 +294,8 @@ class PostDetailTest(TestCase):
         """ Make POST request by authorized user with invalid data (empty body)"""
         client = Client()
 
-        # client.login(username=self.test_user.username, password=self.test_password)
-        # token = Token.objects.create(user=self.test_user)
-
         response = client.post(
-            reverse('api:post-detail', kwargs={'slug': 'slug'}),
+            reverse('api:post-comments', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.test_auth_token),
             data=json.dumps({}),
             content_type='application/json'
@@ -324,12 +314,6 @@ class PostDetailTest(TestCase):
 
         client = Client()
         response = client.get(reverse('api:post-detail', kwargs={'slug': 'single-comment-slug'}))
-
-        # response.data['url'] = response.data['url'][17:]
-        # response.data['edit_url'] = response.data['edit_url'][17:]
-        # response.data['author'] = response.data['author'][17:]
-        # response.data['comments'][0]['author'] = response.data['comments'][0]['author'][17:]
-        # response.data['like_url'] = response.data['like_url'][17:]
 
         factory = RequestFactory()
 
@@ -359,22 +343,34 @@ class PostDetailTest(TestCase):
             )
 
         client = Client()
-        response = client.get(reverse('api:post-detail', kwargs={'slug': 'several-comments-slug'}))
+        response = client.get(reverse('api:post-comments', kwargs={'slug': 'several-comments-slug'}))
 
-        response.data['url'] = response.data['url'][17:]
-        response.data['report_url'] = response.data['report_url'][17:]
-        response.data['author'] = response.data['author'][17:]
-        response.data['like_url'] = response.data['like_url'][17:]
+        response_results = []
+        for i in range(len(response.data['results'])):
+            response.data['results'][i]['url'] = response.data['results'][i]['url'][17:]
+            response.data['results'][i]['author'] = response.data['results'][i]['author'][17:]
+            response.data['results'][i]['report_url'] = response.data['results'][i]['report_url'][17:]
+            response.data['results'][i]['post_url'] = response.data['results'][i]['post_url'][17:]
+        response_results.extend(response.data['results'])
+        next_page = response.data['next']
+        while next_page:
+            for i in range(len(response.data['results'])):
+                response.data['results'][i]['url'] = response.data['results'][i]['url'][17:]
+                response.data['results'][i]['author'] = response.data['results'][i]['author'][17:]
+                response.data['results'][i]['report_url'] = response.data['results'][i]['report_url'][17:]
+                response.data['results'][i]['post_url'] = response.data['results'][i]['post_url'][17:]
 
-        for comment in response.data['comments']:
-            comment['author'] = comment['author'][17:]
+            response_results.extend(response.data['results'])
+            response = client.get(next_page)
+            next_page = response.data['next']
 
         post = Post.objects.get(slug='several-comments-slug')
-        serializer = PostDetailSerializer(post, context={'request': None})
+        comments = Comment.objects.filter(post=post, status=1)
+        serializer = CommentSerializer(comments, many=True, context={'request': None})
 
         number_of_comments = Comment.objects.all().filter(post=post).count()
 
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response_results, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(number_of_comments, 10)
 
@@ -413,18 +409,14 @@ class UserDetailTest(TestCase):
         client = Client()
         response = client.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
 
-        # view = UserDetail.as_view()
-
         request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
-        # response = view(request, username='test_user')
 
         test_request = Request(request)
-        # test_request.user = AnonymousUser()
 
         User = get_user_model()
 
         user = User.objects.get(username='test_user')
-        serializer = UserSerializer(user, context={'request': test_request})
+        serializer = UserSerializer(user, context={'request': test_request, 'kwargs': {'username': 'test_user'}})
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -442,8 +434,31 @@ class UserDetailTest(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    def test_get_user_with_posts(self):
-        """ Test user with several active posts """
+
+class UserObjectsTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.User = get_user_model()
+
+        cls.factory = RequestFactory()
+
+        cls.password = 'test_password'
+        cls.user = cls.User.objects.create_user(username='test_user')
+        cls.user.set_password(cls.password)
+        cls.user.save()
+
+        client = Client()
+
+        response = client.post(
+            reverse('api:token_obtain_pair'),
+            data=json.dumps({'username': cls.user.username, 'password': cls.password}),
+            content_type='application/json'
+        )
+
+        cls.auth_token = response.data['access']
+
+    def test_get_posts(self):
+        """ Test user objects list with several active posts """
         Post.objects.create(
             title="Title",
             content="Content",
@@ -460,25 +475,30 @@ class UserDetailTest(TestCase):
         )
 
         client = Client()
-        response = client.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
+        response = client.get(reverse('api:user-objects', kwargs={'username': 'test_user', 'object_type': 'posts'}))
 
-        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
-
+        request = self.factory.get(reverse('api:user-objects', kwargs={'username': 'test_user', 'object_type': 'posts'}))
         test_request = Request(request)
-        # test_request.user = self.user
 
-        User = get_user_model()
+        author = self.User.objects.get(username='test_user')
+        posts = Post.objects.filter(author=author)
+        serializer = PostListSerializer(posts, many=True, context={'request': test_request})
 
-        user = User.objects.get(username='test_user')
-        serializer = UserSerializer(user, context={'request': test_request})
+        response_results = []
+        response_results.extend(response.data['results'])
+        next_page = response.data['next']
+        while next_page:
+            response_results.extend(response.data['results'])
+            response = client.get(next_page)
+            next_page = response.data['next']
 
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response_results, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_get_user_with_different_posts(self):
-        """ Test user with active and draft posts. """
-        #  Factory request.user and Client request.user is AnonymousUser,
-        #  so data will include only single active post
+    def test_get_different_posts(self):
+        """ Test user objects list with active and draft posts
+        Factory request.user and Client request.user is AnonymousUser,
+        so data will include only single active post """
         Post.objects.create(
             title="Title",
             content="Content",
@@ -495,23 +515,29 @@ class UserDetailTest(TestCase):
         )
 
         client = Client()
-        response = client.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
+        response = client.get(reverse('api:user-objects', kwargs={'username': 'test_user', 'object_type': 'posts'}))
 
-        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
+        request = self.factory.get(reverse('api:user-objects', kwargs={'username': 'test_user', 'object_type': 'posts'}))
 
         test_request = Request(request)
 
-        User = get_user_model()
+        author = self.User.objects.get(username='test_user')
+        posts = Post.objects.filter(author=author, status=1)
+        serializer = PostListSerializer(posts, many=True, context={'request': test_request})
 
-        user = User.objects.get(username='test_user')
-        serializer = UserSerializer(user, context={'request': test_request})
+        response_results = []
+        response_results.extend(response.data['results'])
+        next_page = response.data['next']
+        while next_page:
+            response_results.extend(response.data['results'])
+            response = client.get(next_page)
+            next_page = response.data['next']
 
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response_results, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_get_user_with_comments_request_by_owner(self):
-        """ Test user with active and draft comments.
-        Comments shows only for owner, so client must be logged as owner"""
+    def test_get_comments_by_owner(self):
+        """ Test user objects list with active and draft comments."""
         test_post = Post.objects.create(
             title="Title",
             content="Content",
@@ -535,30 +561,38 @@ class UserDetailTest(TestCase):
         )
 
         client = Client()
-        client.login(username=self.user.username, password=self.password)
-        # token = Token.objects.create(user=self.user)
 
         response = client.get(
-            reverse('api:user-detail', kwargs={'username': 'test_user'}),
+            reverse('api:user-objects', kwargs={'username': 'test_user', 'object_type': 'comments'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token)
         )
 
-        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
+        request = self.factory.get(
+            reverse('api:user-objects', kwargs={'username': 'test_user', 'object_type': 'comments'}),
+            HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token)
+        )
 
         test_request = Request(request)
         test_request.user = self.user
 
-        User = get_user_model()
+        author = self.User.objects.get(username='test_user')
+        comments = Comment.objects.filter(author=author)
+        serializer = CommentSerializer(comments, many=True, context={'request': test_request})
 
-        user = User.objects.get(username='test_user')
-        serializer = UserSerializer(user, context={'request': test_request})
+        response_results = []
+        response_results.extend(response.data['results'])
+        next_page = response.data['next']
+        while next_page:
+            response_results.extend(response.data['results'])
+            response = client.get(next_page)
+            next_page = response.data['next']
 
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response_results, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_get_user_with_comments_request_by_other_user(self):
+    def test_get_comments(self):
         """ Test user with active and draft comments.
-        Comments must be hidden for other users """
+        Draft comments must be hidden for other users """
         test_post = Post.objects.create(
             title="Title",
             content="Content",
@@ -571,23 +605,30 @@ class UserDetailTest(TestCase):
             body="test comment",
             post=test_post,
             author=self.user,
-            status=1
+            status=0
         )
 
         client = Client()
         response = client.get(
-            reverse('api:user-detail', kwargs={'username': 'test_user'})
+            reverse('api:user-objects', kwargs={'username': 'test_user', 'object_type': 'comments'})
         )
 
-        request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
+        request = self.factory.get(reverse('api:user-objects', kwargs={'username': 'test_user', 'object_type': 'comments'}))
         test_request = Request(request)
 
-        User = get_user_model()
+        author = self.User.objects.get(username='test_user')
+        comments = Comment.objects.filter(author=author, status=1)
+        serializer = CommentSerializer(comments, many=True, context={'request': test_request})
 
-        user = User.objects.get(username='test_user')
-        serializer = UserSerializer(user, context={'request': test_request})
+        response_results = []
+        response_results.extend(response.data['results'])
+        next_page = response.data['next']
+        while next_page:
+            response_results.extend(response.data['results'])
+            response = client.get(next_page)
+            next_page = response.data['next']
 
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response_results, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
@@ -614,8 +655,6 @@ class CreateNewPost(TestCase):
 
         cls.auth_token = response.data['access']
 
-        # self.token = Token.objects.create(user=self.user)
-
     def test_post_request_by_unauthorized_user(self):
         """ Make POST request by unauthorized user """
         client = Client()
@@ -623,7 +662,7 @@ class CreateNewPost(TestCase):
         response = client.post(
             reverse('api:new-post'),
             data=json.dumps({}),
-            content_type='multipart/form-data'
+            content_type='application/json'
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -638,7 +677,7 @@ class CreateNewPost(TestCase):
             reverse('api:new-post'),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({}),
-            content_type='multipart/form-data'
+            content_type='application/json'
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -647,13 +686,13 @@ class CreateNewPost(TestCase):
         """ Make POST request with valid data """
         client = Client()
 
-        client.login(username=self.user.username, password=self.password)
+        # client.login(username=self.user.username, password=self.password)
 
         response = client.post(
             reverse('api:new-post'),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
-            content_type='multipart/form-data'
+            content_type='application/json'
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -669,11 +708,11 @@ class CreateNewPost(TestCase):
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content",
                              "some_extra_field": "test value", "status": 1}),
-            content_type='multipart/form-data'
+            content_type='application/json'
         )
         post = Post.objects.all()[0]
 
-        self.assertEqual(post.status, 0)
+        self.assertEqual(post.status, 1)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
@@ -821,8 +860,6 @@ class EditPostTest(TestCase):
 
         cls.auth_token = response.data['access']
 
-        # self.token = Token.objects.create(user=self.user)
-
         cls.test_post = Post.objects.create(
             title="Title",
             content="Content",
@@ -836,7 +873,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": "Test content"}),
             content_type='application/json'
@@ -854,7 +891,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"title": "Test title", "content": self.test_post.content}),
             content_type='application/json'
@@ -872,7 +909,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
             data=json.dumps({"content": "Test content", "title": self.test_post.title}),
             content_type='application/json'
@@ -890,7 +927,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.get(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(self.auth_token),
         )
 
@@ -905,7 +942,7 @@ class EditPostTest(TestCase):
         client = Client()
 
         response = client.patch(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             data=json.dumps({"content": "Test content", "title": self.test_post.title}),
             content_type='application/json'
         )
@@ -938,13 +975,14 @@ class EditPostTest(TestCase):
 
         another_auth_token = response.data['access']
 
-        response = client.get(
-            reverse('api:edit-post', kwargs={'slug': 'slug'}),
+        response = client.patch(
+            reverse('api:post-detail', kwargs={'slug': 'slug'}),
             HTTP_AUTHORIZATION='JWT {}'.format(another_auth_token),
+            data=json.dumps({"content": "Test content", "title": "test title"})
         )
 
-        self.assertEqual(response.data['detail'], "You don't have permission to edit this post")
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data['detail'], 'You do not have permission to perform this action.')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class SearchPostTest(TestCase):

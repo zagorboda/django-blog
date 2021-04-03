@@ -27,9 +27,27 @@ def create_new_post(title, text, slug,  author, status=0):
 
 class UserDetailPageTests(TestCase):
 
-    def test_user_page_existing_user(self):
+    @classmethod
+    def setUpTestData(cls):
         test_user = create_new_user('test_user',
                                     'test_password')
+
+        test_user_1 = create_new_user('test_user_1',
+                                    'test_password')
+
+        cls.test_post = create_new_post('New title',
+                                    'Some text',
+                                    'some-text',
+                                    test_user,
+                                    status=1)
+
+        cls.draft_post = create_new_post('draft title',
+                                        'draft text',
+                                        'draft-text1',
+                                        test_user,
+                                        status=0)
+
+    def test_user_page_existing_user(self):
         response = self.client.get(reverse('user_app:profile', kwargs={'name': 'test_user'}))
         self.assertEqual(response.status_code, 200)
 
@@ -38,38 +56,23 @@ class UserDetailPageTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_user_page_user_without_posts(self):
-        test_user = create_new_user('test_user',
-                                    'test_password')
-        response = self.client.get(reverse('user_app:profile', kwargs={'name': 'test_user'}))
+        response = self.client.get(reverse('user_app:profile', kwargs={'name': 'test_user_1'}))
+
         self.assertQuerysetEqual(
-            response.context['posts_list'],
+            response.context['post_list'],
             []
         )
 
     def test_user_page_user_with_posts(self):
-        test_user = create_new_user('test_user',
-                                    'test_password')
-        test_post = create_new_post('New title',
-                                    'Some text',
-                                    'some-text',
-                                    test_user,
-                                    status=1)
         response = self.client.get(reverse('user_app:profile', kwargs={'name': 'test_user'}))
         self.assertQuerysetEqual(
-            response.context['posts_list'],
+            response.context['post_list'],
             ['<Post: New title>']
         )
 
     def test_user_page_user_with_draft_posts(self):
-        test_user = create_new_user('test_user',
-                                    'test_password')
-        test_post = create_new_post('New title',
-                                    'Some text',
-                                    'some-text',
-                                    test_user,
-                                    status=0)
         response = self.client.get(reverse('user_app:profile', kwargs={'name': 'test_user'}))
         self.assertQuerysetEqual(
-            response.context['posts_list'],
-            []
+            response.context['post_list'],
+            ['<Post: New title>']
         )

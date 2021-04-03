@@ -1,18 +1,29 @@
+from django import forms
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 
+from ckeditor.widgets import CKEditorWidget
+
 from .models import Post, Comment, ReportPost, Tag, ReportComment
 
 
+class PostAdminForm(forms.ModelForm):
+    content = forms.CharField(widget=CKEditorWidget())
+
+    class Meta:
+        model = Post
+        fields = '__all__'
+
+
 class PostAdmin(admin.ModelAdmin):
+    form = PostAdminForm
     list_display = ('title', 'author', 'slug', 'status', 'created_on', 'formatted_hit_count', 'formatted_likes')
     list_filter = ('status',)
-    readonly_fields = ('formatted_hit_count', 'formatted_likes')
-    search_fields = ('title', 'content', 'author__username', 'tags__tagline')
+    readonly_fields = ('formatted_hit_count', 'formatted_likes', 'author',)
+    search_fields = ('title', 'author__username')
+    raw_id_fields = ('author', )
     prepopulated_fields = {'slug': ('title',)}
-    # fields = ('title', )
-    # fieldsets = None
     exclude = ('likes',)
 
     filter_horizontal = ('tags',)
@@ -36,12 +47,13 @@ class CommentAdmin(admin.ModelAdmin):
     list_display = ('author', 'short_description', 'post_link', 'created_on')
     list_filter = ('status', 'created_on')
     list_display_links = ('author',)
-    readonly_fields = ('post_link',)
+    readonly_fields = ('post_link', 'parent', 'author')
     search_fields = ('body', 'post__title', 'author__username')
-    actions = ['approve_comments']
+    actions = ('approve_comments', )
+    exclude = ('post', )
 
     def approve_comments(self, request, queryset):
-        queryset.update(active=True)
+        queryset.update(status=1)
 
     def post_link(self, obj):
         return mark_safe('<a href="{}">{}</a>'.format(

@@ -1,39 +1,72 @@
+from datetime import datetime
+
 from django.contrib.auth import get_user_model, password_validation
 from django.core import exceptions
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.core.validators import validate_email
+from django.utils.crypto import get_random_string
 from django.utils.encoding import force_bytes, force_text
 from django.utils.http import urlsafe_base64_decode
+from django.utils.text import slugify
 
 from rest_framework import serializers
-from rest_framework.validators import UniqueValidator
 from rest_framework.reverse import reverse
 
 from blog_app.models import Post, Comment, Tag
 
 from .tokens import password_reset_token
-
-# class FieldMixin(object):
-#     def get_field_names(self, *args, **kwargs):
-#         field_names = self.context.get('fields', None)
-#         if field_names:
-#             return field_names
-#
-#         return super(FieldMixin, self).get_field_names(*args, **kwargs)
+from scripts import filter_html
 
 
 class CommentSerializer(serializers.ModelSerializer):
-    """ Serialize comments """
+    """
+    Serialize comments
+    """
+
+    url = serializers.SerializerMethodField('get_url')
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
     author_username = serializers.ReadOnlyField(source='author.username')
     status = serializers.ReadOnlyField()
+    report_url = serializers.SerializerMethodField('get_report_url')
+    child_comments_url = serializers.SerializerMethodField('get_child_comments_url')
+    post_url = serializers.SerializerMethodField('get_post_url')
+
+    def validate_parent(self, parent):
+        # Allow user to reply only to top-level comments
+        if parent.is_parent:
+            return parent
+        raise serializers.ValidationError('Incorrect parent id. Replies allowed only to top-level comments')
+
+    def get_url(self, obj):
+        request = self.context['request']
+        return reverse('api:comment-detail', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=request)
+
+    def get_post_url(self, obj):
+        request = self.context['request']
+        return reverse('api:post-detail', kwargs={'slug': obj.post.slug}, request=request)
+
+    def get_report_url(self, obj):
+        request = self.context['request']
+        return reverse('api:report-comment', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=request)
+
+    def get_child_comments_url(self, obj):
+        if obj.children() and obj.is_parent:
+            request = self.context['request']
+            return reverse('api:comment-detail', kwargs={'slug': obj.post.slug, 'id': obj.id}, request=request)
 
     class Meta:
-        # list_serializer_class = FilteredCommentSerializer
         model = Comment
-        fields = ('id', 'author', 'author_username', 'body', 'created_on', 'status')
+        fields = ('id', 'url', 'author', 'author_username', 'body', 'parent', 'created_on', 'status', 'report_url',
+                  'parent_id', 'parent', 'post_url', 'child_comments_url')
+        extra_kwargs = {
+            'parent': {'write_only': True},
+        }
 
 
 class TagSerializer(serializers.ModelSerializer):
+    """
+    Serialize taglines
+    """
 
     class Meta:
         model = Tag
@@ -42,56 +75,37 @@ class TagSerializer(serializers.ModelSerializer):
             'tagline': {'validators': []},
         }
 
-    def create(self, validated_data):
-        pass # get_or_create
-
-    # def get_unique_validators(self):
-    #     """Overriding method to disable unique checks"""
-    #     return []
-
 
 class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
-    """ Serialize post, return list of comments """
+    """
+    Serialize detail blogpost information
+    """
+
     url = serializers.HyperlinkedIdentityField(view_name='api:post-detail', lookup_field='slug')
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
 
-    # comments = CommentSerializer(many=True, read_only=True)
-    comments = serializers.SerializerMethodField('get_active_comments')
-    # edit_url = serializers.HyperlinkedRelatedField(view_name='edit-post', read_only=True, lookup_field='slug')
-    edit_url = serializers.SerializerMethodField('get_edit_url')
+    comments_url = serializers.SerializerMethodField('get_comments_url')
 
     total_views = serializers.SerializerMethodField('get_hits_count')
     total_likes = serializers.SerializerMethodField('get_likes')
     like_url = serializers.SerializerMethodField('get_like_url')
     report_url = serializers.SerializerMethodField('get_report_url')
 
-    # tags = serializers.SerializerMethodField('get_tags')
-    tags = TagSerializer(many=True, read_only=False, required=False)
-    image = serializers.ImageField(max_length=None, allow_empty_file=True, allow_null=True, required=False)
-    # image_url = serializers.SerializerMethodField('get_image_url')
+    tags = TagSerializer(many=True, required=False, validators=[])
 
     class Meta:
         model = Post
-        fields = ('url', 'edit_url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author',
-                  'created_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'image', 'tags',
-                  'comments')
+        fields = ('url', 'id', 'status', 'title', 'content', 'slug', 'author_username', 'author', 'created_on',
+                  'updated_on', 'total_views', 'total_likes', 'like_url', 'report_url', 'tags', 'comments_url')
         extra_kwargs = {
-            'tags': {'validators': []},
+            'slug': {'read_only': True},
+            'status': {'read_only': True},
         }
 
-    def get_active_comments(self, obj):
-        """ Return only active comments (active=True) """
-        posts = Comment.objects.all().filter(status=1, post=obj)
-        serializer = CommentSerializer(posts, many=True, context={'request': self.context['request']})
-        return serializer.data
-
-    def get_edit_url(self, obj):
-        """ Return url to edit-post view """
-        request = self.context['request']
-        if request and request.user.id == obj.author.id:
-            return reverse('api:edit-post', kwargs={'slug': obj.slug}, request=request)
-        return None
+    def get_comments_url(self, obj):
+        """ Return url to resource with list of related comments """
+        return reverse('api:post-comments', kwargs={'slug': obj.slug}, request=self.context['request'])
 
     def get_hits_count(self, obj):
         return obj.hit_count.hits
@@ -100,70 +114,69 @@ class PostDetailSerializer(serializers.HyperlinkedModelSerializer):
         return obj.get_number_of_likes()
 
     def get_like_url(self, obj):
-        request = self.context['request']
-        return reverse('api:post-like', kwargs={'slug': obj.slug}, request=request)
+        return reverse('api:post-like', kwargs={'slug': obj.slug}, request=self.context['request'])
 
     def get_report_url(self, obj):
-        request = self.context['request']
-        return reverse('api:report-post', kwargs={'slug': obj.slug}, request=request)
+        return reverse('api:report-post', kwargs={'slug': obj.slug}, request=self.context['request'])
 
-    def get_tags(self, obj):
-        """ Return tags """
-        tags = Tag.objects.all().filter(post=obj)
-        tag_list = [tag.tagline for tag in tags]
-        return tag_list
+    def create(self, validated_data):
+        tags = validated_data.pop('tags') if 'tags' in validated_data else None
 
-    def get_image_url(self, obj):
-        """ Return url to image """
-        if obj.image != '':
-            request = self.context.get("request")
-            return request.build_absolute_uri(obj.image.url)
-        return None
+        title = validated_data['title']
+        content = validated_data['content']
+        author = self.context['request'].user
 
-    # def update(self, instance, validated_data):
-    #     print(validated_data)
-    #     # tags = validated_data.pop('tags', None)
-    #     Post.objects.filter(pk=instance.id).update(**validated_data)
-    #     post = Post.objects.get(pk=instance.id)
-    #     return post
-    #     # print(validated_data)
-    #     # print(obj)
-    #
-    #     # obj.update(**validated_data)
-    #
-    #     # return obj
-    #
-    #     # post = Post.objects.get(data)
-    #     # for track_data in tracks_data:
-    #     #     Track.objects.create(album=album, **track_data)
+        content = filter_html.filter_html_input(content)
 
-    # def create(self, validated_data):
-    #     tags = validated_data.pop('tags')
-    #     post = Post.objects.create(**validated_data)
-    #     return post
-    #
-    # def validate(self, data):
-    #     # for tag in data['tags']:
-    #     #     print(tag)
-    #     return data
+        #  generate slug from user data
+        slug = slugify('{}-{}-{}'.format(
+            validated_data['title'],
+            self.context['request'].user.username,
+            datetime.now().strftime('%Y-%m-%d'))
+        )
+        while Post.objects.filter(slug=slug).exists():
+            slug = '{}-{}'.format(slug, get_random_string(length=2))
 
-    # def get_attr_or_default(self, attr, attrs, default=''):
-    #     """Return the value of key ``attr`` in the dict ``attrs``; if that is
-    #     not present, return the value of the attribute ``attr`` in
-    #     ``self.instance``; otherwise return ``default``.
-    #     """
-    #     return attrs.get(attr, getattr(self.instance, attr, ''))
+        post = Post.objects.create(
+            title=title,
+            content=content,
+            slug=slug,
+            author=author,
+            created_on=datetime.now(),
+            updated_on=datetime.now(),
+            status=1
+        )
 
-    # def get_field_names(self, *args, **kwargs):
-    #     field_names = self.context.get('fields', None)
-    #     if field_names:
-    #         return field_names
-    #
-    #     return super(PostDetailSerializer, self).get_field_names(*args, **kwargs)
+        if tags:
+            list_of_tags = [list(tag.values())[0] for tag in tags]
+
+            post.tags.add(*[Tag.objects.get_or_create(tagline=tag)[0] for tag in list_of_tags])
+
+        return post
+
+    def update(self, post, validated_data):
+        post.title = validated_data.get('title', post.title)
+        content = validated_data.get('content', post.content)
+        content = filter_html.filter_html_input(content)
+        post.content = content
+
+        tags = validated_data.pop('tags') if 'tags' in validated_data else None
+
+        post.save()
+
+        if tags:
+            list_of_tags = [list(tag.values())[0] for tag in tags]
+
+            post.tags.set([Tag.objects.get_or_create(tagline=tag)[0] for tag in list_of_tags])
+
+        return post
 
 
 class PostListSerializer(serializers.HyperlinkedModelSerializer):
-    """ Serialize posts; content length is 200 chars, don't return comments and edit_url"""
+    """
+    Serialize blogposts list
+    """
+
     url = serializers.HyperlinkedIdentityField(view_name='api:post-detail', lookup_field='slug')
     author_username = serializers.ReadOnlyField(source='author.username')
     author = serializers.HyperlinkedRelatedField(view_name='api:user-detail', read_only=True, lookup_field='username')
@@ -182,39 +195,27 @@ class PostListSerializer(serializers.HyperlinkedModelSerializer):
     def get_hits_count(self, obj):
         return obj.hit_count.hits
 
-    def get_likes(self, obj):
-        return obj.get_number_of_likes()
-
-    def get_like_url(self, obj):
-        request = self.context['request']
-        return reverse('api:post-like', kwargs={'slug': obj.slug}, request=request)
-
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
-    """ Serialize user information """
+    """
+    Serialize user information
+    """
+
     url = serializers.HyperlinkedIdentityField(view_name='api:user-detail', lookup_field='username')
-    # posts = serializers.HyperlinkedRelatedField(many=True, view_name='post-detail', read_only=True,
-    #                                             lookup_field='slug')
-    posts = serializers.SerializerMethodField('get_user_posts')
-    comments = serializers.SerializerMethodField('get_comments')
+    posts = serializers.SerializerMethodField('get_user_posts', read_only=True)
+    comments = serializers.SerializerMethodField('get_comments', read_only=True)
 
     def get_user_posts(self, user):
-        """ Return all user posts if owner makes request, for other users return only published posts """
-        if self.context['request'].user == user:
-            posts = Post.objects.all().filter(author=user)
-        else:
-            posts = Post.objects.all().filter(author=user, status=1)
-        serializer = PostListSerializer(posts, many=True, context={'request': self.context['request']})
-        return serializer.data
+        """ Return url to user posts endpoint """
+        request = self.context['request']
+        return reverse('api:user-objects', kwargs={'username': self.context['kwargs']['username'],
+                                                   'object_type': 'posts'}, request=request)
 
     def get_comments(self, user):
-        """ Return comments only if owner makes request """
-        if self.context['request'].user == user:
-            comments = Comment.objects.all().filter(author=user)
-        else:
-            comments = []
-        serializer = CommentSerializer(comments, many=True, context={'request': self.context['request']})
-        return serializer.data
+        """ Return url to user comments endpoint """
+        request = self.context['request']
+        return reverse('api:user-objects', kwargs={'username': self.context['kwargs']['username'],
+                                                   'object_type': 'comments'}, request=request)
 
     class Meta:
         User = get_user_model()
@@ -222,43 +223,10 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'username', 'bio', 'posts', 'comments')
 
 
-# class CreateUserSerializer(serializers.ModelSerializer):
-#     username = serializers.CharField(
-#             validators=[UniqueValidator(queryset=User.objects.all())]
-#             )
-#     password = serializers.CharField(min_length=8)
-#
-#     def create(self, validated_data):
-#         user = User.objects.create_user(validated_data['username'], '', validated_data['password'])
-#         return user
-#
-#     class Meta:
-#         model = User
-#         fields = ('id', 'password', 'username')
-#         extra_kwargs = {'password': {'write_only': True}}
-
-
-# class RegisterSerializer(serializers.ModelSerializer):
-#
-#     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
-#
-#     class Meta:
-#         User = get_user_model()
-#         model = User
-#         fields = ('username', 'password')
-#
-#     def create(self, validated_data):
-#         User = get_user_model()
-#         user = User.objects.create_user(username=validated_data['username'])
-#
-#         user.set_password(validated_data['password'])
-#         user.save()
-#
-#         return user
-
-
 class RegisterUserSerializer(serializers.ModelSerializer):
-    """ Serializer for user signup """
+    """
+    Serialize user signup
+    """
 
     class Meta:
         User = get_user_model()
@@ -273,7 +241,6 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         errors = dict()
         try:
             password_validation.validate_password(password, self.context['request'].user)
-            # validate_password(password=password)
         except exceptions.ValidationError as e:
             errors['password'] = list(e.messages)
         if errors:
@@ -292,7 +259,10 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    """ Serializer for password change endpoint """
+    """
+    Serialize password change
+    """
+
     old_password = serializers.CharField(write_only=True, required=True)
     new_password1 = serializers.CharField(write_only=True, required=True)
     new_password2 = serializers.CharField(write_only=True, required=True)
@@ -318,13 +288,17 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class ResetPasswordEmailSerializer(serializers.Serializer):
-    """ Serializer for email input for password reset endpoint """
+    """
+    Serialize email input for password reset
+    """
 
     email = serializers.EmailField()
 
 
 class ResetPasswordSerializer(serializers.Serializer):
-    """ Serializer for password reset """
+    """
+    Serialize password reset
+    """
 
     new_password = serializers.CharField(write_only=True, required=True)
 
@@ -345,6 +319,9 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 class EditProfileSerializer(serializers.ModelSerializer):
+    """
+    Serialize user profile changes
+    """
 
     def update(self, instance, validated_data):
         return super().update(instance, validated_data)

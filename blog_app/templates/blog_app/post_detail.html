@@ -1,4 +1,4 @@
-{% extends 'layouts/base.html' %}
+    {% extends 'layouts/base.html' %}
 
 {% load hitcount_tags %}
 
@@ -13,35 +13,32 @@
                 <p><a href="{%url 'blog_app:edit_post' post.slug%}">Edit this post</a></p>
             {% endif %}
 
-            {% if post.image %}
-                <img src="{{ post.image.url }}" alt="{{ post.title }}">
-            {% endif %}
-
             <p>
                 {%for tag in tags%}
                 <span style="padding:0.3em;">
 
-                    <a href="{%url 'blog_app:search' %}?q={{tag}}">#{{tag}}&#8203;</a>
+                    <a href="{%url 'blog_app:home' %}?q={{tag}}">#{{tag}}&#8203;</a>
                 </span>
                 {%endfor%}
             </p>
 
             <p class="text-muted"> Views: {% get_hit_count for post %} </p>
-            <p id="likes"> Likes: <span id="likes_count"> {{ post.likes.count }} </span></p>
+
+            <p id ="likes"> Likes: <span id ="likes_count"> {{ post.likes.count }} </span></p>
+            {% if user.is_authenticated %}
+                <p>
+                    {% if is_liked %}
+                    <button class="btn btn-primary" name="like" id="like" onclick="make_ajax_request(this)">Remove like</button>
+                    {% else %}
+                    <button class="btn btn-primary" name="like" id="like" onclick="make_ajax_request(this)">Like</button>
+                    {% endif %}
+                </p>
+            {% endif %}
 
             <p><a href="{%url 'blog_app:post_report' post.slug%}">Report this post</a></p>
 
-            {% if user.is_authenticated %}
+            {{ post.content | safe }}
 
-                {% if is_liked %}
-                    <button class="btn btn-primary" name="like" id="like2" onclick="make_ajax_request(this)">Remove like</button>
-                {% else %}
-                    <button class="btn btn-primary" name="like" id="like1" onclick="make_ajax_request(this)">Like</button>
-                {% endif %}
-
-            {% endif %}
-
-            <p align="justify">{{ post.content | linebreaks }}</p>
         </div>
     </div>
 
@@ -50,25 +47,68 @@
     {% if post.comments.all %}
     <div class="container">
         <div class="col-md-12">
-            {% for comment in post.comments.all %}
+            {% for comment in parent_comments.all %}
                 {% if comment.status %}
-                    <div class="comments" style="padding: 10px;" id="{{comment.id}}">
-                        <p class="font-weight-bold">
-                            <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
-                            <span class=" text-muted font-weight-normal">
-                                {{ comment.created_on }}
-                            </span>
+                    <div class="comments">
+                        <div id="{{comment.id}}">
+                            <p class="font-weight-bold" id="comment-title">
+                                <a href="{% url 'user_app:profile' comment.author %}">{{ comment.author }}</a>
+                                <span class=" text-muted font-weight-normal">
+                                    {{ comment.created_on }}
+                                </span>
 
-                            <span class="dropdown" id="more_comment">
-                                <button class="dropbtn btn">&#xFE19;</button>
+                                <span class="report-comment-dropdown" id="report-comment{{comment.id}}">
+                                    <button class="dropbtn btn" onclick="show_report_button({{comment.id}})">&#xFE19;</button>
 
-                            <span class="dropdown-content">
-                                <a href="{%url 'blog_app:post_report' post.slug comment.id%}">Report comment</a>
-                            </span>
-                            </span>
-                        </p>
-                        <p>{{ comment.body | linebreaks }}</p>
+                                    <span class="report-comment-dropdown-content" id = "report-comment-dropdown-content{{comment.id}}">
+                                        <a href="{%url 'blog_app:post_report' post.slug comment.id%}">Report comment</a>
+                                    </span>
+                                </span>
+                            </p>
+                            <p>{{ comment.body | linebreaks }}</p>
+                        </div>
+
+                        {% if user.is_authenticated %}
+                            <button class="btn btn-secondary replybutton" value="0" data-commentbox="panel_{{comment.id}}">Reply</button>
+                            <div class="replybox" style="display:none" id="panel_{{comment.id}}">
+                                <br>
+                                <form method="POST" action=".">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="parent_id" value="{{comment.id}}">
+
+                                    <textarea rows="2" cols="50" name="body" placeholder="Leave your comment..."></textarea>
+                                    <br>
+
+                                    <button type="submit" class="btn btn-primary  btn-lg">Reply</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                        <br> <br>
+
+                        <div class="comments child_comments">
+                            {% for child_comment in comment.children %}
+                                <blockquote>
+                                    <p class="font-weight-bold" id="child_comment-title">
+                                        <a href="{% url 'user_app:profile' child_comment.author %}">{{ child_comment.author }}</a>
+                                        <span class=" text-muted font-weight-normal">
+                                            {{ child_comment.created_on }}
+                                        </span>
+
+                                        <span class="report-comment-dropdown" id="report-comment{{child_comment.id}}">
+                                            <button class="dropbtn btn" onclick="show_report_button({{child_comment.id}})">&#xFE19;</button>
+
+                                            <span class="report-comment-dropdown-content" id = "report-comment-dropdown-content{{child_comment.id}}">
+                                                <a href="{%url 'blog_app:post_report' post.slug child_comment.id%}">Report comment</a>
+                                            </span>
+                                        </span>
+                                    </p>
+                                    <p>{{ child_comment.body | linebreaks }}</p>
+                                </blockquote>
+
+                            {% endfor %}
+                        </div>
                     </div>
+
                 {% endif %}
             {% endfor %}
         </div>
@@ -79,11 +119,15 @@
 
         <div class="container">
             <h3>Leave a comment</h3>
-                <form method="post" style="margin-top: 1.3em;" class="mb-3">
-                    <textarea name="body"></textarea>
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary  btn-lg">Submit</button>
-                </form>
+            <form method="POST" action=".">
+                {% csrf_token %}
+                <input type="hidden" name="parent_id" value="{{comment.id}}">
+
+                <textarea rows="2" cols="50" name="body" placeholder="Leave your comment..."></textarea>
+                <br>
+
+                <button type="submit" class="btn btn-primary  btn-lg">Reply</button>
+            </form>
         </div>
 
     {% else %}
@@ -94,28 +138,53 @@
     {% endif %}
 
     <style>
-        .dropdown {
-          position: relative;
-          display: inline-block;
+
+        .child_comments {
+            border-left: 6px solid #909bfc;
+            padding-left: 10px;
+            margin-left: 10px;
         }
 
-        .dropdown-content {
-          display: none;
-          position: absolute;
-          background-color: #f1f1f1;
-          min-width: 160px;
-          z-index: 1;
+        .report-comment-dropdown {
+            position: relative;
+            display: inline-block;
         }
 
-        .dropdown-content a {
-          display: block;
+        .report-comment-dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f1f1f1;
+            min-width: 160px;
+            z-index: 1;
         }
 
-        .dropdown:hover .dropdown-content {display: block;}
-
+        .report-comment-dropdown-content a {
+            display: block;
+        }
     </style>
 
+
     <script>
+
+    window.addEventListener('mouseup',function(event){
+        l = document.getElementsByClassName('report-comment-dropdown-content');
+        for (let i=0; i<l.length; i++){
+            el = l[i];
+            if(event.target != el && event.target.parentNode != el){
+                el.style.display = 'none';
+            }
+        };
+    });
+
+    function show_report_button(id){
+        report_btn_id = "report-comment-dropdown-content" + id;
+        let report_btn = document.getElementById(report_btn_id);
+        if (report_btn.style.display === "block")
+            report_btn.style.display = "None";
+        else
+            report_btn.style.display = "block";
+    };
+
     function make_ajax_request(elem){
             // create an AJAX call
             $.ajax({
@@ -149,6 +218,21 @@
 
             return false;
         };
+
+    $(function() {
+
+        $('.replybutton').on('click', function() {
+            let btn_value = $('.replybutton').val();
+            if (+btn_value === 1){
+                $('.replybox').hide();
+            } else {
+                let commentboxId= $(this).attr('data-commentbox');
+                $('#'+commentboxId).toggle();
+            }
+        });
+
+    });
+
     </script>
 
 {% else %}

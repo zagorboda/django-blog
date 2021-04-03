@@ -1,22 +1,30 @@
-import os
 from datetime import timedelta
-
 import environ
+import logging.config
+import os
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 TEMPLATES_DIRS = os.path.join(BASE_DIR, 'templates')
 
-# Get env variables
-env = environ.Env()
-environ.Env.read_env()
 
-SECRET_KEY = env("SECRET_KEY")
+env = environ.Env()
+
+if os.path.isfile('blog/.env'):
+    environ.Env.read_env(env.str('ENV_PATH', 'blog/.env'))
+else:
+    environ.Env.read_env(env.str('ENV_PATH', 'blog/.env.example'))
+
+# environ.Env.read_env(env.str('ENV_PATH', 'blog/.env.example'))
+
+SECRET_KEY = env("SECRET_KEY", default='0x!b#(1*cd73w$&azzc6p+essg7v=g80ls#z&xcx*mpemx&@9$') # return fake key if no single in env
 
 DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver', '.herokuapp.com', '0.0.0.0']
+
+ADMINS = []
 
 INSTALLED_APPS = [
 
@@ -31,6 +39,7 @@ INSTALLED_APPS = [
     'rest_framework_swagger',
     'corsheaders',
     'rest_framework_simplejwt.token_blacklist',
+    'ckeditor',
 
     'django.contrib.admin',
     'django.contrib.auth',
@@ -72,17 +81,16 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'blog.wsgi.application'
+
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': env("DATABASE_NAME"),
-        'USER': env("DATABASE_USER"),
-        'PASSWORD': env("DATABASE_PASSWORD"),
-        'HOST': env("DATABASE_HOST"),
-        'PORT': env("DATABASE_PORT"),
-        'TEST': {
-            'NAME': env("TEST_DATABASE_NAME"),
-        }
+        'NAME': env('DOCKER_DATABASE_NAME', default=None) or env('DATABASE_NAME'),
+        'USER': env('DOCKER_DATABASE_USER', default=None) or env('DATABASE_USER'),
+        'PASSWORD': env('DOCKER_DATABASE_PASSWORD', default=None) or env('DATABASE_PASSWORD'),
+        'HOST': env('DOCKER_DATABASE_HOST', default=None) or env('DATABASE_HOST'),
+        'PORT': env('DOCKER_DATABASE_PORT', default=None) or env('DATABASE_PORT'),
     }
 }
 
@@ -124,21 +132,17 @@ LOGOUT_REDIRECT_URL = 'blog_app:home'
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 
-# AUTH_PROFILE_MODULE = ""
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    # 'PAGE_SIZE': 10,
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'api.utils.BrowsableAPIRendererWithoutForms',
+    ),
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
-    # 'DEFAULT_RENDERER_CLASSES': [
-    #     'rest_framework.renderers.JSONRenderer',
-    # ],
-    # 'DEFAULT_PARSER_CLASSES': [
-    #     'rest_framework.parsers.JSONParser',
-    # ]
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
 }
 
 AUTH_USER_MODEL = 'user_app.User'
@@ -146,20 +150,14 @@ AUTH_USER_MODEL = 'user_app.User'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/2.2/howto/static-files/
+CKEDITOR_UPLOAD_PATH = "uploads/"
+CKEDITOR_ALLOW_NONIMAGE_FILES = False
+
 STATIC_URL = '/static/'
 
-# PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
-
-# STATIC_ROOT = os.path.normpath(os.path.join(BASE_DIR, 'staticfiles'))
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles/')
-# STATICFILES_DIRS = (
-#     os.path.join(PROJECT_ROOT, 'staticfiles/'),
-# )
 
 CORS_ORIGIN_ALLOW_ALL = True
-# CORS_ORIGIN_WHITELIST = ('localhost:3000',)
 
 # MAIL_GUN_API_LINK = env('MAIL_GUN_API_LINK')
 # MAIL_GUN_API_TOKEN = env('MAIL_GUN_API_TOKEN')
@@ -175,7 +173,6 @@ CORS_ORIGIN_ALLOW_ALL = True
 
 if not DEBUG:
     # Simplified static file serving.
-    # https://warehouse.python.org/project/whitenoise/
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
     # Heroku: Update database configuration from $DATABASE_URL.
@@ -198,49 +195,50 @@ if not DEBUG:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 else:
     SECURE_SSL_REDIRECT = False
-
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    # EMAIL_FILE_PATH = str(BASE_DIR.join('sent_emails'))
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': ('%(asctime)s [%(process)d] [%(levelname)s] '
-                       'pathname=%(pathname)s lineno=%(lineno)s '
-                       'funcname=%(funcName)s %(message)s'),
-            'datefmt': '%Y-%m-%d %H:%M:%S'
-        },
-        'simple': {
-            'format': '%(levelname)s %(message)s'
-        }
-    },
-    'handlers': {
-        'null': {
-            'level': 'DEBUG',
-            'class': 'logging.NullHandler',
-        },
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose'
-        }
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'django.request': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
+CKEDITOR_CONFIGS = {
+    'default': {
+        'skin': 'moono',
+        'toolbar_Basic': [
+            ['Source', '-', 'Bold', 'Italic']
+        ],
+        'toolbar_YourCustomToolbarConfig': [
+            {'name': 'document', 'items': ['Source', '-', 'Save', 'Preview', 'Print']},
+            {'name': 'clipboard', 'items': ['Cut', 'Copy', 'Paste', 'PasteText', 'PasteFromWord', '-', 'Undo', 'Redo']},
+            {'name': 'editing', 'items': ['Find', 'Replace', '-', 'SelectAll']},
+            '/',
+            {'name': 'basicstyles',
+             'items': ['Bold', 'Italic', 'Underline', 'Strike', 'Subscript', 'Superscript', '-', 'RemoveFormat']},
+            {'name': 'paragraph',
+             'items': ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent', '-', 'Blockquote', '-',
+                       'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock']},
+            {'name': 'links', 'items': ['Link', 'Unlink', 'Anchor']},
+            {'name': 'insert',
+             'items': ['Image', 'Table', 'HorizontalRule', 'SpecialChar']},
+            '/',
+            {'name': 'styles', 'items': ['Styles', 'Format', 'Font', 'FontSize']},
+            {'name': 'colors', 'items': ['TextColor', 'BGColor']},
+            {'name': 'tools', 'items': ['Maximize', 'ShowBlocks']},
+            {'name': 'about', 'items': ['About']},
+        ],
+        'toolbar': 'YourCustomToolbarConfig',
+        'tabSpaces': 4,
+        'extraPlugins': ','.join([
+            'div',
+            'autolink',
+            'autoembed',
+            'embedsemantic',
+            'autogrow',
+            'widget',
+            'lineutils',
+            'clipboard',
+            'dialog',
+            'dialogui',
+            'elementspath'
+        ]),
     }
 }
-
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
@@ -262,3 +260,53 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
+
+
+if env('DOCKER_DATABASE_NAME', default=None):
+    logfile = 'logs/docker_log.log'
+else:
+    logfile = 'logs/python_log.log'
+
+LOGGING_CONFIG = None
+logging.config.dictConfig({
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+        },
+        'verbose': {
+            'format': ('%(asctime)s [%(process)d] [%(levelname)s] '
+                       'pathname=%(pathname)s lineno=%(lineno)s '
+                       'funcname=%(funcName)s %(message)s'),
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        }
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        }
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, logfile),
+            'formatter': 'verbose'
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler'
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['file', 'mail_admins'],
+            'propagate': True,
+            'level': 'INFO',
+        },
+    },
+})

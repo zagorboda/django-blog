@@ -1,5 +1,4 @@
 from . import views
-from api.views import schema_view
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -7,10 +6,7 @@ from django.conf.urls.static import static
 app_name = 'blog_app'
 urlpatterns = [
     path('', views.PostList.as_view(), name='home'),
-    path('search/', views.search, name='search'),
     path('new_post/', views.create_new_post, name='new_post'),
-
-    path('schema/', schema_view, name='schema'),
 
     path('post/<slug:slug>/', views.PostDetail.as_view(), name='post_detail'),
     path('post/<slug:slug>/like/', views.PostLikeToggle.as_view(), name='post_like'),
