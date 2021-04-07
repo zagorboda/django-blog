@@ -30,7 +30,7 @@ class EmptyBlogMainPageTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
-class GetAllPostsTest(TestCase):
+class BlogMainPageTest(TestCase):
     """ Test module for get all Post objects if number of objects less than pagination_size"""
 
     @classmethod
@@ -86,8 +86,15 @@ class GetAllPostsTest(TestCase):
         self.assertEqual(response.data['results'], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_post_request(self):
+        """ Testing not allowed POST method """
+        client = Client()
+        response = client.post(reverse('api:blog_main_page'))
 
-class GetAllPostsOverPaginationTest(TestCase):
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class BlogMainPagePaginationTest(TestCase):
     """ Test module for get all Post objects if number of objects greater than pagination_size"""
 
     @classmethod
@@ -140,18 +147,6 @@ class GetAllPostsOverPaginationTest(TestCase):
 
         self.assertEqual(result, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-
-class MainPagePostRequestTest(TestCase):
-    """ Test module for post request to blog_main_page.
-        BlogMainPage inherits from generics.ListAPIView, which provides only get method"""
-
-    def test_post_request(self):
-        """ Testing not allowed POST method """
-        client = Client()
-        response = client.post(reverse('api:blog_main_page'))
-
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
 class PostDetailTest(TestCase):
@@ -380,8 +375,8 @@ class UserDetailTest(TestCase):
     #  In this module I test User page. To get user data from db I need to use UserSerializer,
     #  which inherits from HyperlinkedModelSerializer. HyperlinkedModelSerializer requires request
     #  when initiating, and in UserSerializer I use self.context['request'].user == user, so I somehow
-    #  need a request to be passed to serializer. To make request I use RequestFactory(), then pass this
-    #  request into Request() class and then pass it to serializer.
+    #  need a request to be passed to serializer. To create request I use RequestFactory() and
+    #  Request() class.
 
     @classmethod
     def setUpTestData(cls):
@@ -408,7 +403,6 @@ class UserDetailTest(TestCase):
         """ Get detail for existing user without posts and comments"""
         client = Client()
         response = client.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
-
         request = self.factory.get(reverse('api:user-detail', kwargs={'username': 'test_user'}))
 
         test_request = Request(request)

@@ -1,18 +1,6 @@
 version: "3.3"
 
 services:
-  nginx:
-    build:
-      context: ./docker/nginx
-      dockerfile: Dockerfile
-    ports:
-      - 1300:80
-    volumes:
-      - static_volume:/nginx/static
-    depends_on:
-      - web
-    restart: "on-failure"
-
   postgresdb:
     build:
       context: ./docker/postgres
@@ -24,7 +12,6 @@ services:
     expose:
       - "5434" # Publishes specific port to other containers but NOT to host machine
     command: -p 5434
-    restart: "on-failure"
 
   web:
     build:
@@ -36,7 +23,3 @@ services:
       - "8000:8000"
     depends_on:
       - postgresdb
-    restart: "on-failure"
-
-volumes:
-  static_volume:

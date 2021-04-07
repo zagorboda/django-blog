@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from blog_app.models import Post, Comment, Tag, ReportPost, ReportComment
-from .permissions import IsOwnerOrReadOnly, IsOwnerOrIsAuthenticatedOrReadOnly
+from .permissions import IsOwnerOrReadOnly, IsSelfUserOrReadOnly
 from .serializers import (
     UserSerializer, PostListSerializer, PostDetailSerializer, CommentSerializer, RegisterUserSerializer,
     ChangePasswordSerializer, ResetPasswordSerializer, ResetPasswordEmailSerializer, EditProfileSerializer
@@ -162,7 +162,7 @@ class UserDetail(APIView):
         fields: bio,
     ).
     """
-    permission_classes = (IsOwnerOrReadOnly, )
+    permission_classes = (IsSelfUserOrReadOnly, )
 
     lookup_field = 'username'
 
